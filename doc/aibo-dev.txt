@@ -57,17 +57,17 @@ Directory layout:
 	├── command/                    # Command modules
 	│   ├── aibo.lua               # Main Aibo command
 	│   └── aibo_send.lua          # AiboSend command
-	├── integration/               # AI agent integrations
+	├── integration/               # AI tool integrations
+	│   ├── init.lua              # Integration management
 	│   ├── claude.lua            # Claude integration
 	│   ├── codex.lua             # Codex integration
 	│   └── ollama.lua            # Ollama integration
 	├── internal/                  # Internal utilities
 	│   ├── argparse.lua          # Argument parsing
-	│   ├── console.lua           # Console buffer mgmt
-	│   ├── controller.lua        # Process controller
-	│   ├── prompt.lua            # Prompt buffer mgmt
-	│   ├── send.lua              # Content sending
-	│   └── utils.lua             # Common utilities
+	│   ├── console_window.lua    # Console window management
+	│   ├── prompt_window.lua     # Prompt window management
+	│   ├── timing.lua            # Debounce and throttle utilities
+	│   └── argparse.lua          # Argument parsing (already listed above)
 	├── health.lua                # Health check
 	└── init.lua                  # Main entry point
 
@@ -77,7 +77,7 @@ Directory layout:
 	ftplugin/
 	├── aibo-prompt.lua           # Prompt filetype
 	├── aibo-console.lua          # Console filetype
-	└── aibo-agent-*.lua          # Agent-specific
+	└── aibo-tool-*.lua           # Tool-specific
 <
 
 Key principles:
@@ -107,7 +107,7 @@ INTEGRATION POINTS				*aibo-dev-integration*
 Extension points for new features:
 
 1. Command hooks via `on_attach` callbacks
-2. Agent-specific integrations in `integration/`
+2. Tool-specific integrations in `integration/`
 3. Custom <Plug> mappings in ftplugin files
 4. Buffer-specific configuration
 
@@ -127,7 +127,7 @@ Core module (`require("aibo")`):
 		    - prompt_height (number): Prompt window height (default: 10)
 		    - prompt (table): Prompt buffer configuration
 		    - console (table): Console buffer configuration
-		    - agents (table): Agent-specific configuration
+		    - tools (table): Tool-specific configuration
 
 `aibo.send({data}, {bufnr})`			*aibo.send()*
 		Send raw data to terminal.
@@ -158,14 +158,14 @@ Core module (`require("aibo")`):
 		Returns: ~
 		  (table) Buffer configuration
 
-`aibo.get_agent_config({agent})`		*aibo.get_agent_config()*
-		Get agent-specific configuration.
+`aibo.get_tool_config({tool})`		*aibo.get_tool_config()*
+		Get tool-specific configuration.
 
 		Parameters: ~
-		  {agent}  (string) Agent name (e.g., "claude")
+		  {tool}  (string) Tool name (e.g., "claude")
 
 		Returns: ~
-		  (table) Agent configuration
+		  (table) Tool configuration
 
 `aibo.termcode.resolve({input})`		*aibo.termcode.resolve()*
 		Convert Vim key notation to terminal escape sequences.
@@ -187,14 +187,16 @@ INTERNAL API					*aibo-dev-api-internal*
 
 Internal modules (not part of public API, may change):
 
-`internal.controller`				*aibo-dev-controller*
-		Process and buffer lifecycle management.
+`internal.console_window`			*aibo-dev-console-window*
+		Console window and terminal management.
 
 		Functions: ~
-		  - new(): Create new controller instance
-		  - start(): Start terminal process
-		  - send(): Send data to process
-		  - close(): Clean up resources
+		  - open(): Open new console window
+		  - get_info_by_bufnr(): Get console info by buffer
+		  - get_info_by_winid(): Get console info by window
+		  - find_info_in_tabpage(): Find console in current tab
+		  - send(): Send data to terminal
+		  - follow(): Move cursor to last line
 
 `aibo.termcode`					*aibo-dev-termcode*
 		Terminal escape sequence translation (public API).
@@ -220,25 +222,23 @@ Internal modules (not part of public API, may change):
 		  - get_option_completions(): Get completions
 		  - parse_for_completion(): Parse for completion context
 
-`internal.console`				*aibo-dev-console*
-		Console buffer management.
+`internal.prompt_window`			*aibo-dev-prompt-window*
+		Prompt window management.
 
 		Functions: ~
-		  - setup_buffer(): Initialize console buffer
-		  - setup_mappings(): Set up key mappings
+		  - open(): Open prompt window for console
+		  - get_info_by_bufnr(): Get prompt info by buffer
+		  - get_info_by_winid(): Get prompt info by window
+		  - find_info_in_tabpage(): Find prompt in current tab
+		  - write(): Write content to prompt buffer
+		  - submit(): Submit prompt content to console
 
-`internal.prompt`				*aibo-dev-prompt*
-		Prompt buffer management.
-
-		Functions: ~
-		  - setup_buffer(): Initialize prompt buffer
-		  - setup_mappings(): Set up key mappings
-
-`internal.send`					*aibo-dev-send*
-		Content sending logic.
+`internal.timing`				*aibo-dev-timing*
+		Utility functions for debouncing and throttling.
 
 		Functions: ~
-		  - call(): Send content with options
+		  - debounce(): Create debounced function
+		  - throttle(): Create throttled function
 
 COMMAND MODULE API				*aibo-dev-api-command*
 
@@ -263,7 +263,7 @@ Integration modules export:
 		Structure: ~
 >
 		{
-		  ["<Plug>(aibo-agent-action)"] = function(bufnr)
+		  ["<Plug>(aibo-tool-action)"] = function(bufnr)
 		    -- Implementation
 		  end,
 		}
@@ -286,10 +286,13 @@ TEST STRUCTURE					*aibo-dev-test-structure*
 Test organization:
 >
 	tests/
-	├── unit/                 # Unit tests
-	│   ├── test_aibo_core.lua
+	├── internal/             # Internal module tests
+	│   ├── test_init.lua
 	│   ├── test_argparse.lua
-	│   └── test_console.lua
+	│   ├── test_console_window.lua
+	│   ├── test_prompt_window.lua
+	│   ├── test_timing.lua
+	│   └── test_termcode.lua
 	├── integrations/         # Integration tests
 	│   ├── test_claude.lua
 	│   ├── test_codex.lua
@@ -299,26 +302,26 @@ Test organization:
 	│   └── test_aibo_send_command.lua
 	├── plugin/               # Plugin tests
 	│   └── test_plugin_setup.lua
-	├── helpers.lua          # Test utilities
-	└── test_runner.lua      # Test runner
+	├── mock.lua             # Test mocking utilities
+	└── runner.lua           # Test runner
 <
 
 WRITING TESTS					*aibo-dev-test-writing*
 
 Test structure:
 >
-	local helpers = require("tests.helpers")
+	local mock = require("tests.mock")
 	local T = require("mini.test")
 
 	local test_set = T.new_set()
 
 	-- Setup/teardown
 	test_set.hooks.pre_case = function()
-	  helpers.setup()
+	  -- Setup clean environment
 	end
 
 	test_set.hooks.post_case = function()
-	  helpers.cleanup()
+	  -- Cleanup resources
 	end
 
 	-- Test cases
@@ -354,7 +357,7 @@ Using just:
 
 Direct execution:
 >
-	nvim --headless -c "luafile tests/test_runner.lua" -c "qa!"
+	nvim --headless -c "luafile tests/runner.lua" -c "qa!"
 <
 
 =============================================================================
@@ -528,7 +531,7 @@ To add support for a new AI tool:
 
 2. Create ftplugin file:
 >
-	-- ftplugin/aibo-agent-myai.lua
+	-- ftplugin/aibo-tool-myai.lua
 	local bufnr = vim.api.nvim_get_current_buf()
 
 	-- Load integration
@@ -570,19 +573,19 @@ Creating <Plug> mappings:
 1. Define in integration module:
 >
 	M.plug_mappings = {
-	  ["<Plug>(aibo-agent-action)"] = handler_function,
+	  ["<Plug>(aibo-tool-action)"] = handler_function,
 	}
 <
 
 2. Register in ftplugin:
 >
-	vim.keymap.set("n", "<Plug>(aibo-agent-action)", handler,
+	vim.keymap.set("n", "<Plug>(aibo-tool-action)", handler,
 	  { buffer = bufnr, silent = true })
 <
 
 3. Create default mapping:
 >
-	vim.keymap.set("n", "<C-x>", "<Plug>(aibo-agent-action)",
+	vim.keymap.set("n", "<C-x>", "<Plug>(aibo-tool-action)",
 	  { buffer = bufnr })
 <
 

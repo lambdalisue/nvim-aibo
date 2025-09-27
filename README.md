@@ -120,7 +120,7 @@ This opens a terminal console running the interactive CLI tool with a prompt buf
 
 > [!WARNING]
 > **Key mapping difference:** To prevent unintended interrupts from the Vimmer's habit of hitting `<Esc>` repeatedly, `<Esc>` is NOT mapped in Aibo buffers. Instead:
-> - Use `<C-c>` to send `<Esc>` to the AI agent (works in both normal and insert mode)
+> - Use `<C-c>` to send `<Esc>` to the AI tool (works in both normal and insert mode)
 > - Use `g<C-c>` to send the interrupt signal (original `<C-c>` behavior, normal mode only)
 
 Type in the prompt buffer and press `<CR>` in normal mode to submit. The prompt clears automatically for the next message. You can also use `<C-Enter>` or `<F5>` to submit even while in insert mode, which is particularly useful for continuous typing.
@@ -240,7 +240,7 @@ require('aibo').setup({
       -- Custom setup for prompt buffers
       -- Runs AFTER ftplugin files
       -- info.type = "prompt"
-      -- info.agent = agent name (e.g., "claude")
+      -- info.tool = tool name (e.g., "claude")
       -- info.aibo = aibo instance
     end,
   },
@@ -254,8 +254,8 @@ require('aibo').setup({
     end,
   },
 
-  -- Agent-specific overrides
-  agents = {
+  -- Tool-specific overrides
+  tools = {
     claude = {
       no_default_mappings = false,
       on_attach = function(bufnr, info)
@@ -272,10 +272,10 @@ require('aibo').setup({
 
 #### Callback Order
 
-When both buffer type and agent-specific `on_attach` callbacks are defined, both are called in this order:
+When both buffer type and tool-specific `on_attach` callbacks are defined, both are called in this order:
 
 1. Buffer type `on_attach` (e.g., `prompt.on_attach`)
-2. Agent-specific `on_attach` (e.g., `agents.claude.on_attach`)
+2. Tool-specific `on_attach` (e.g., `tools.claude.on_attach`)
 
 ### Customizing Keymaps
 
@@ -299,7 +299,7 @@ vim.keymap.set('n', '<Up>', '<Plug>(aibo-prompt-prev)', { buffer = bufnr })
 ```
 
 ```lua
--- ~/.config/nvim/after/ftplugin/aibo-agent-claude.lua
+-- ~/.config/nvim/after/ftplugin/aibo-tool-claude.lua
 local bufnr = vim.api.nvim_get_current_buf()
 
 -- Add leader-based mappings for Claude
@@ -370,7 +370,7 @@ require('aibo').setup({
 
 Plus all console buffer mappings.
 
-### Agent-Specific (Claude)
+### Tool-Specific (Claude)
 
 | Key                       | Action                   |
 | ------------------------- | ------------------------ |
@@ -383,7 +383,7 @@ Plus all console buffer mappings.
 | `!`                       | Enter bash mode (n)      |
 | `#`                       | Memorize context (n)     |
 
-### Agent-Specific (Codex)
+### Tool-Specific (Codex)
 
 | Key          | Action          |
 | ------------ | --------------- |
@@ -417,8 +417,8 @@ vim.keymap.set('n', '<C-k>', '<Plug>(aibo-prompt-submit-close)', { buffer = bufn
 | ---------------------------------- | ----------------- |
 | `<Plug>(aibo-prompt-submit)`       | Submit prompt     |
 | `<Plug>(aibo-prompt-submit-close)` | Submit and close  |
-| `<Plug>(aibo-prompt-esc)`          | Send ESC to agent |
-| `<Plug>(aibo-prompt-interrupt)`    | Interrupt agent   |
+| `<Plug>(aibo-prompt-esc)`          | Send ESC to tool  |
+| `<Plug>(aibo-prompt-interrupt)`    | Interrupt tool    |
 | `<Plug>(aibo-prompt-clear)`        | Clear screen      |
 | `<Plug>(aibo-prompt-next)`         | Next history      |
 | `<Plug>(aibo-prompt-prev)`         | Previous history  |
@@ -431,15 +431,15 @@ vim.keymap.set('n', '<C-k>', '<Plug>(aibo-prompt-submit-close)', { buffer = bufn
 | -------------------------------- | -------------------- |
 | `<Plug>(aibo-console-submit)`    | Submit empty message |
 | `<Plug>(aibo-console-close)`     | Close console        |
-| `<Plug>(aibo-console-esc)`       | Send ESC to agent    |
-| `<Plug>(aibo-console-interrupt)` | Interrupt agent      |
+| `<Plug>(aibo-console-esc)`       | Send ESC to tool     |
+| `<Plug>(aibo-console-interrupt)` | Interrupt tool       |
 | `<Plug>(aibo-console-clear)`     | Clear screen         |
 | `<Plug>(aibo-console-next)`      | Next history         |
 | `<Plug>(aibo-console-prev)`      | Previous history     |
 | `<Plug>(aibo-console-down)`      | Move down            |
 | `<Plug>(aibo-console-up)`        | Move up              |
 
-#### Claude Agent
+#### Claude Tool
 
 | <Plug> Mapping                   | Description       |
 | -------------------------------- | ----------------- |
@@ -452,7 +452,7 @@ vim.keymap.set('n', '<C-k>', '<Plug>(aibo-prompt-submit-close)', { buffer = bufn
 | `<Plug>(aibo-claude-bash-mode)`  | Enter bash mode   |
 | `<Plug>(aibo-claude-memorize)`   | Memorize context  |
 
-#### Codex Agent
+#### Codex Tool
 
 | <Plug> Mapping                  | Description     |
 | ------------------------------- | --------------- |
@@ -463,13 +463,13 @@ vim.keymap.set('n', '<C-k>', '<Plug>(aibo-prompt-submit-close)', { buffer = bufn
 | `<Plug>(aibo-codex-page-down)`  | Page down       |
 | `<Plug>(aibo-codex-quit)`       | Quit            |
 
-### Agent-Specific Setup
+### Tool-Specific Setup
 
-Configure agent-specific behavior through setup:
+Configure tool-specific behavior through setup:
 
 ```lua
 require('aibo').setup({
-  agents = {
+  tools = {
     claude = {
       no_default_mappings = true,  -- Disable Claude-specific defaults
       on_attach = function(bufnr, info)
@@ -482,13 +482,13 @@ require('aibo').setup({
 })
 ```
 
-### Adding New Agents
+### Adding New Tools
 
-Define custom agents with their own configuration:
+Define custom tools with their own configuration:
 
 ```lua
 require('aibo').setup({
-  agents = {
+  tools = {
     myai = {
       no_default_mappings = false,
       on_attach = function(bufnr, info)
