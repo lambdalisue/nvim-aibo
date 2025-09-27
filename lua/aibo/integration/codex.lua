@@ -138,6 +138,12 @@ local function get_value_completions(arg, prefix, _context)
   return nil
 end
 
+---Check if codex command is available
+---@return boolean
+function M.is_available()
+  return vim.fn.executable("codex") == 1
+end
+
 ---Get completion candidates for Codex command arguments
 ---@param arglead string Current argument being typed
 ---@param cmdline string Full command line
@@ -197,43 +203,6 @@ function M.get_command_completions(arglead, cmdline, _cursorpos)
   return completions
 end
 
----Check if codex command is available
----@return boolean
-function M.is_available()
-  return vim.fn.executable("codex") == 1
-end
-
----Get help text for Codex arguments
----@return string[]
-function M.get_help()
-  local help = {}
-  table.insert(help, "OpenAI Codex CLI - Interactive AI coding assistant")
-  table.insert(help, "")
-  table.insert(help, "Interactive Commands:")
-  table.insert(help, "  resume                    Resume a previous session")
-  table.insert(help, "  resume --last             Resume the most recent session")
-  table.insert(help, "  resume <SESSION_ID>       Resume specific session")
-  table.insert(help, "")
-  table.insert(help, "Options:")
-
-  for _, arg_info in ipairs(CODEX_ARGUMENTS) do
-    if not arg_info.is_subcommand and not arg_info.is_resume_option then
-      local line = string.format("  %-25s %s", arg_info.arg, arg_info.description)
-      table.insert(help, line)
-    end
-  end
-
-  table.insert(help, "")
-  table.insert(help, "Interactive usage examples:")
-  table.insert(help, "  codex                     Start interactive session")
-  table.insert(help, '  codex "fix the bug"       Start with initial prompt')
-  table.insert(help, "  codex resume --last       Resume last session")
-  table.insert(help, "  codex -i image.png        Attach image to prompt")
-  table.insert(help, "  codex --model gpt-4       Use specific model")
-
-  return help
-end
-
 ---Run health check for Codex integration
 ---@param report table Health check reporter functions
 function M.check_health(report)
@@ -280,37 +249,40 @@ end
 
 ---Setup Codex <Plug> mappings
 ---@param bufnr number Buffer number to set mappings for
-function M.setup_plug_mappings(bufnr)
+function M.setup_mappings(bufnr)
   local aibo = require("aibo")
 
-  local CODEX_CODES = {
-    transcript = "\020",
-  }
+  local define = function(lhs, desc, rhs)
+    vim.keymap.set({ "n", "i" }, lhs, rhs, {
+      buffer = bufnr,
+      desc = desc,
+      silent = true,
+    })
+  end
 
-  -- Define <Plug> mappings for Codex functionality
-  vim.keymap.set({ "n", "i" }, "<Plug>(aibo-codex-transcript)", function()
-    aibo.send(CODEX_CODES.transcript, bufnr)
-  end, { buffer = bufnr, desc = "Transcript (Ctrl+T)" })
+  local send = function(key)
+    local code = aibo.termcode.resolve(key)
+    aibo.send(code, bufnr)
+  end
 
-  vim.keymap.set({ "n", "i" }, "<Plug>(aibo-codex-home)", function()
-    aibo.send(aibo.termcode.resolve("<Home>"), bufnr)
-  end, { buffer = bufnr, desc = "Home" })
-
-  vim.keymap.set({ "n", "i" }, "<Plug>(aibo-codex-end)", function()
-    aibo.send(aibo.termcode.resolve("<End>"), bufnr)
-  end, { buffer = bufnr, desc = "End" })
-
-  vim.keymap.set({ "n", "i" }, "<Plug>(aibo-codex-page-up)", function()
-    aibo.send(aibo.termcode.resolve("<PageUp>"), bufnr)
-  end, { buffer = bufnr, desc = "Page up" })
-
-  vim.keymap.set({ "n", "i" }, "<Plug>(aibo-codex-page-down)", function()
-    aibo.send(aibo.termcode.resolve("<PageDown>"), bufnr)
-  end, { buffer = bufnr, desc = "Page down" })
-
-  vim.keymap.set({ "n", "i" }, "<Plug>(aibo-codex-quit)", function()
-    aibo.send("q", bufnr)
-  end, { buffer = bufnr, desc = "Quit" })
+  define("<Plug>(aibo-codex-transcript)", "Transcript (Ctrl+T)", function()
+    send("<C-t>")
+  end)
+  define("<Plug>(aibo-codex-home)", "Home", function()
+    send("<Home>")
+  end)
+  define("<Plug>(aibo-codex-end)", "End", function()
+    send("<End>")
+  end)
+  define("<Plug>(aibo-codex-page-up)", "Page up", function()
+    send("<PageUp>")
+  end)
+  define("<Plug>(aibo-codex-page-down)", "Page down", function()
+    send("<PageDown>")
+  end)
+  define("<Plug>(aibo-codex-quit)", "Quit", function()
+    send("q")
+  end)
 end
 
 return M

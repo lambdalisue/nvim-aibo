@@ -1,36 +1,33 @@
 -- Tests for OpenAI Codex integration (lua/aibo/integration/codex.lua)
 
-local helpers = require("tests.helpers")
+local mock = require("tests.mock")
 local T = require("mini.test")
 
 -- Test set
 local test_set = T.new_set({
   hooks = {
-    pre_case = function()
-      helpers.setup()
-    end,
     post_case = function()
-      helpers.cleanup()
+      vim.cmd("silent! %bwipeout!")
     end,
   },
 })
 
--- Test Codex command availability
+-- Test Codex is_available
 test_set["Codex is_available"] = function()
   local codex = require("aibo.integration.codex")
 
   -- Mock executable
-  local restore = helpers.mock_executable({
+  local restore = mock.mock_executable({
     codex = true,
   })
 
-  T.expect.equality(codex.is_available(), true)
+  T.expect.equality(codex.is_available(), true, "Should be available when codex exists")
 
   -- Test when not available
   vim.fn.executable = function()
     return 0
   end
-  T.expect.equality(codex.is_available(), false)
+  T.expect.equality(codex.is_available(), false, "Should not be available when codex missing")
 
   restore()
 end
@@ -203,28 +200,6 @@ test_set["Codex mixed arguments"] = function()
   T.expect.equality(vim.tbl_contains(completions, "--cd"), true)
 end
 
--- Test get_help function
-test_set["Codex get_help"] = function()
-  local codex = require("aibo.integration.codex")
-
-  local help = codex.get_help()
-
-  -- Check that help is a table
-  T.expect.equality(type(help), "table")
-  T.expect.equality(#help > 0, true)
-
-  -- Check for key content in help
-  local help_text = table.concat(help, "\n")
-  T.expect.equality(help_text:find("OpenAI Codex") ~= nil, true)
-  T.expect.equality(help_text:find("resume") ~= nil, true)
-  T.expect.equality(help_text:find("--model") ~= nil, true)
-  T.expect.equality(help_text:find("--image") ~= nil, true)
-
-  -- Check that non-interactive exec subcommand is not mentioned
-  T.expect.equality(help_text:find(" exec ") == nil, true)
-  T.expect.equality(help_text:find("Non%-interactive") == nil, true)
-end
-
 -- Test check_health function
 test_set["Codex check_health"] = function()
   local codex = require("aibo.integration.codex")
@@ -247,7 +222,7 @@ test_set["Codex check_health"] = function()
   }
 
   -- Mock executable
-  local restore = helpers.mock_executable({
+  local restore = mock.mock_executable({
     codex = true,
     node = true,
   })

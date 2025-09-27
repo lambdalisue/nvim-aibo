@@ -89,10 +89,10 @@ local function parse_key(str)
   local key = str
 
   if str:match("%-") then
-    -- Collect modifiers in canonical order: C, A/M, S
-    local has_c = str:match("C%-")
-    local has_a = str:match("[AM]%-")
-    local has_s = str:match("S%-")
+    -- Collect modifiers in canonical order: C, A/M, S (case-insensitive)
+    local has_c = str:match("[Cc]%-")
+    local has_a = str:match("[AaMm]%-")
+    local has_s = str:match("[Ss]%-")
 
     if has_c then
       mod_str = mod_str .. "C"

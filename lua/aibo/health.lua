@@ -24,7 +24,7 @@ local function get_command_version(_cmd, _args)
 end
 
 function M.check()
-  start("aibo.nvim")
+  start("aibo")
 
   -- Check Neovim version
   info("Neovim version: " .. vim.fn.execute("version"):match("NVIM v[^\n]+"))
@@ -101,17 +101,8 @@ function M.check()
     error = error,
     info = info,
   }
-
-  -- Check Claude integration
-  local ok_claude, claude = pcall(require, "aibo.integration.claude")
-  if ok_claude and claude.check_health then
-    claude.check_health(report)
-  end
-
-  -- Check Codex integration
-  local ok_codex, codex = pcall(require, "aibo.integration.codex")
-  if ok_codex and codex.check_health then
-    codex.check_health(report)
+  for _, tool in ipairs(aibo.integration.available_integrations()) do
+    aibo.integration.check_health(tool, report)
   end
 
   -- Check terminal features
@@ -171,8 +162,8 @@ function M.check()
   local ftplugins = {
     "aibo-prompt.lua",
     "aibo-console.lua",
-    "aibo-agent-claude.lua",
-    "aibo-agent-codex.lua",
+    "aibo-tool-claude.lua",
+    "aibo-tool-codex.lua",
   }
 
   local plugin_root = debug.getinfo(1, "S").source:sub(2):match("(.*/)")
@@ -200,12 +191,7 @@ function M.check()
 
   local core_modules = {
     { name = "aibo", desc = "Main module" },
-    { name = "aibo.internal.console", desc = "Console management" },
-    { name = "aibo.internal.prompt", desc = "Prompt management" },
-    { name = "aibo.internal.controller", desc = "Terminal controller" },
-    { name = "aibo.internal.send", desc = "Send functionality" },
-    { name = "aibo.internal.argparse", desc = "Argument parsing" },
-    { name = "aibo.internal.utils", desc = "Utility functions" },
+    { name = "aibo.termcode", desc = "Termcode module" },
     { name = "aibo.command.aibo", desc = ":Aibo command" },
     { name = "aibo.command.aibo_send", desc = ":AiboSend command" },
   }

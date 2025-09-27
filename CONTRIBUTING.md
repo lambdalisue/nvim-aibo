@@ -51,17 +51,16 @@ lua/aibo/
 ├── command/                    # Command modules
 │   ├── aibo.lua               # Main Aibo command implementation
 │   └── aibo_send.lua          # AiboSend command implementation
-├── integration/               # AI agent integrations
+├── integration/               # AI tool integrations
 │   ├── claude.lua            # Claude-specific features and mappings
 │   ├── codex.lua             # Codex-specific features and mappings
 │   └── ollama.lua            # Ollama-specific features and mappings
 ├── internal/                  # Internal utilities
 │   ├── argparse.lua          # Command argument parsing
-│   ├── console.lua           # Console buffer management
-│   ├── controller.lua        # Process and buffer controller
-│   ├── prompt.lua            # Prompt buffer management
-│   ├── send.lua              # Content sending logic
-│   └── utils.lua             # Common utilities
+│   ├── console_window.lua    # Console window management
+│   ├── prompt_window.lua     # Prompt window management
+│   ├── timing.lua            # Debounce and throttle utilities
+│   └── argparse.lua          # Command argument parsing
 ├── health.lua                # Health check implementation
 └── init.lua                  # Main module entry point
 
@@ -71,9 +70,9 @@ plugin/
 ftplugin/
 ├── aibo-prompt.lua           # Prompt buffer filetype settings
 ├── aibo-console.lua          # Console buffer filetype settings
-├── aibo-agent-claude.lua     # Claude-specific mappings
-├── aibo-agent-codex.lua      # Codex-specific mappings
-└── aibo-agent-ollama.lua     # Ollama-specific mappings
+├── aibo-tool-claude.lua      # Claude-specific mappings
+├── aibo-tool-codex.lua       # Codex-specific mappings
+└── aibo-tool-ollama.lua      # Ollama-specific mappings
 ```
 
 ### Key Architectural Principles
@@ -86,14 +85,14 @@ ftplugin/
 
 2. **Module Responsibilities**
    - `command/`: User command parsing and execution
-   - `integration/`: Agent-specific features and behaviors
+   - `integration/`: Tool-specific features and behaviors
    - `internal/`: Core functionality and utilities
    - `ftplugin/`: Buffer-specific settings and mappings
 
 3. **Data Flow**
    - Commands → Controller → Terminal Process
    - User Input → Prompt → Send → Console
-   - Agent Output → Console → User Display
+   - Tool Output → Console → User Display
 
 ## Code Style
 
@@ -280,10 +279,10 @@ local config = aibo.get_config()
 ---@return table config
 local prompt_cfg = aibo.get_buffer_config(type)
 
--- Get agent-specific configuration
----@param agent string Agent name (e.g., "claude")
+-- Get tool-specific configuration
+---@param tool string Tool name (e.g., "claude")
 ---@return table config
-local agent_cfg = aibo.get_agent_config(agent)
+local tool_cfg = aibo.get_tool_config(tool)
 ```
 
 ### Internal APIs
@@ -295,7 +294,7 @@ Internal modules in `lua/aibo/internal/` are not part of the public API and may 
 To add support for a new AI tool or interactive CLI:
 
 1. Create integration module in `lua/aibo/integration/`
-2. Add ftplugin file for agent-specific mappings
+2. Add ftplugin file for tool-specific mappings
 3. Update completion logic in command modules
 4. Add tests for the integration
 5. Update documentation

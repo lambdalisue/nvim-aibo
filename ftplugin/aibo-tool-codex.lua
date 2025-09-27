@@ -6,11 +6,8 @@ vim.b.loaded_aibo_agent_codex_ftplugin = true
 local bufnr = vim.api.nvim_get_current_buf()
 local aibo = require("aibo")
 
--- Setup <Plug> mappings from Codex integration module
-require("aibo.integration.codex").setup_plug_mappings(bufnr)
-
 -- Default key mappings (unless disabled in config)
-local cfg = aibo.get_agent_config("codex")
+local cfg = aibo.get_tool_config("codex")
 if not (cfg and cfg.no_default_mappings) then
   vim.keymap.set({ "n", "i" }, "<C-t>", "<Plug>(aibo-codex-transcript)", { buffer = bufnr })
   vim.keymap.set({ "n", "i" }, "<Home>", "<Plug>(aibo-codex-home)", { buffer = bufnr })
@@ -19,3 +16,4 @@ if not (cfg and cfg.no_default_mappings) then
   vim.keymap.set({ "n", "i" }, "<PageDown>", "<Plug>(aibo-codex-page-down)", { buffer = bufnr })
   vim.keymap.set({ "n" }, "q", "<Plug>(aibo-codex-quit)", { buffer = bufnr })
 end
+

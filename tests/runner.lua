@@ -1,5 +1,5 @@
--- Simple test runner for aibo.nvim
--- Run with: nvim --headless -c "luafile tests/test_runner.lua" -c "qa!"
+-- Simple test runner for aibo
+-- Run with: nvim --headless -c "luafile tests/runner.lua" -c "qa!"
 
 local M = {}
 
@@ -14,6 +14,15 @@ package.path = project_root .. "/lua/?.lua;" .. project_root .. "/lua/?/init.lua
 
 -- Load the plugin to register commands and setup
 vim.cmd("runtime plugin/aibo.lua")
+
+-- Mock vim.ui.select globally to prevent test hanging
+local original_ui_select = vim.ui.select
+vim.ui.select = function(items, opts, on_choice)
+  -- In tests, always select first item immediately
+  if on_choice then
+    on_choice(items and items[1] or nil)
+  end
+end
 
 -- Bootstrap mini.nvim if not installed (needed by test files)
 local mini_path = vim.fn.stdpath("data") .. "/site/pack/deps/start/mini.nvim"
@@ -45,10 +54,12 @@ _G.T = mini_test
 
 -- List of test files organized by category
 local test_files = {
-  -- Unit tests
-  "unit/test_aibo_core",
-  "unit/test_argparse",
-  "unit/test_console",
+  -- Internal module tests
+  "internal/test_init",
+  "internal/test_argparse",
+  "internal/test_console_window",
+  "internal/test_prompt_window",
+  "internal/test_timing",
 
   -- Command tests
   "commands/test_aibo_command",

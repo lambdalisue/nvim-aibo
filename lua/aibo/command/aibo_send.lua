@@ -27,17 +27,51 @@ end
 --- @param options table Options table { line1?: number, line2?: number, input?: boolean, submit?: boolean, replace?: boolean, prefix?: string, suffix?: string }
 --- @return nil
 function M.call(options)
+  local prompt = require("aibo.internal.prompt_window")
+
   options = options or {}
 
-  require("aibo.internal.send").send({
-    line1 = options.line1,
-    line2 = options.line2,
-    input = options.input or false,
-    submit = options.submit or false,
-    replace = options.replace or false,
-    prefix = options.prefix,
-    suffix = options.suffix,
-  })
+  local start_line = options.line1 or 1
+  local end_line = options.line2 or vim.api.nvim_buf_line_count(0)
+  local input = options.input or false
+  local submit = options.submit or false
+  local replace = options.replace or false
+  local prefix = options.prefix or nil
+  local suffix = options.suffix or nil
+
+  -- Get the content to send
+  local content = table.concat(vim.api.nvim_buf_get_lines(0, start_line - 1, end_line, false), "\n")
+  if prefix then
+    content = prefix .. content
+  end
+  if suffix then
+    content = content .. suffix
+  end
+
+  -- Find a prompt info
+  local prompt_info = prompt.find_info_in_tabpage()
+  if not prompt_info then
+    vim.notify("No Aibo console window found in current tabpage", vim.log.levels.WARN)
+    return
+  end
+
+  -- Write content to the prompt buffer (and submit if requested)
+  prompt.write(prompt_info.bufnr, vim.split(content, "\n", { plain = true }), { replace = replace })
+  if submit then
+    prompt.submit(prompt_info.bufnr)
+  end
+
+  if input then
+    -- Wait a bit for submission to complete
+    vim.defer_fn(function()
+      if vim.api.nvim_win_is_valid(prompt_info.console_info.winid) then
+        vim.api.nvim_set_current_win(prompt_info.console_info.winid)
+        vim.api.nvim_win_call(prompt_info.console_info.winid, function()
+          vim.cmd("startinsert")
+        end)
+      end
+    end, 0)
+  end
 end
 
 --- Create AiboSend user command with all functionality

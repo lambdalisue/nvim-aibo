@@ -1,5 +1,20 @@
 local M = {}
 
+local OPENERS = {
+  "-opener=split",
+  "-opener=vsplit",
+  "-opener=tabedit",
+  "-opener=edit",
+  "-opener=topleft\\ split",
+  "-opener=topleft\\ vsplit",
+  "-opener=botright\\ split",
+  "-opener=botright\\ vsplit",
+  "-opener=leftabove\\ split",
+  "-opener=leftabove\\ vsplit",
+  "-opener=rightbelow\\ split",
+  "-opener=rightbelow\\ vsplit",
+}
+
 --- Internal completion function for Aibo command
 --- @param arglead string Current argument being completed
 --- @param cmdline string Full command line
@@ -7,6 +22,7 @@ local M = {}
 --- @return string[] List of completions
 local function complete(arglead, cmdline, cursorpos)
   local argparse = require("aibo.internal.argparse")
+  local integration = require("aibo.integration")
   local known_options = {
     opener = true, -- -opener=value
     stay = false, -- -stay flag
@@ -16,7 +32,7 @@ local function complete(arglead, cmdline, cursorpos)
 
   -- Parse command line to determine tool completion context first
   local state = argparse.parse_for_completion(cmdline, known_options)
-  local known_tools = { "claude", "codex", "ollama" }
+  local known_tools = integration.available_integrations()
 
   -- Filter out empty strings from remaining
   local non_empty_remaining = vim.tbl_filter(function(arg)
@@ -27,23 +43,9 @@ local function complete(arglead, cmdline, cursorpos)
   if #non_empty_remaining == 0 then
     -- No arguments yet - handle global options or offer tool names
     if arglead:match("^-opener=") then
-      local openers = {
-        "-opener=split",
-        "-opener=vsplit",
-        "-opener=tabedit",
-        "-opener=edit",
-        "-opener=topleft\\ split",
-        "-opener=topleft\\ vsplit",
-        "-opener=botright\\ split",
-        "-opener=botright\\ vsplit",
-        "-opener=leftabove\\ split",
-        "-opener=leftabove\\ vsplit",
-        "-opener=rightbelow\\ split",
-        "-opener=rightbelow\\ vsplit",
-      }
       return vim.tbl_filter(function(val)
         return val:find("^" .. vim.pesc(arglead))
-      end, openers)
+      end, OPENERS)
     elseif arglead:match("^%-") then
       return argparse.get_option_completions(arglead, cmdline, known_options)
     else
@@ -107,23 +109,7 @@ local function complete(arglead, cmdline, cursorpos)
   end
 
   -- Delegate to tool integration
-  local integrations = {
-    claude = "aibo.integration.claude",
-    codex = "aibo.integration.codex",
-    ollama = "aibo.integration.ollama",
-  }
-  local module_name = integrations[tool]
-  if module_name then
-    local ok, integration = pcall(require, module_name)
-    if ok and integration.get_command_completions then
-      local comp_ok, completions = pcall(integration.get_command_completions, arglead, tool_cmdline, tool_cursorpos)
-      if comp_ok then
-        return completions
-      end
-    end
-  end
-
-  return {}
+  return integration.get_command_completions(tool, arglead, tool_cmdline, tool_cursorpos)
 end
 
 --- Execute Aibo command with given arguments and options
@@ -132,7 +118,11 @@ end
 --- @return nil
 function M.call(args, options)
   if not args or type(args) ~= "table" or #args == 0 then
-    vim.api.nvim_err_writeln("Usage: require('aibo.command.aibo').call(args, options) where args is a non-empty array")
+    vim.notify(
+      "Usage: require('aibo.command.aibo').call(args, options) where args is a non-empty array",
+      vim.log.levels.INFO,
+      { title = "Aibo" }
+    )
     return
   end
 
@@ -150,18 +140,26 @@ function M.call(args, options)
 
   -- Validate mutually exclusive options
   if toggle and reuse then
-    vim.api.nvim_err_writeln("Error: toggle and reuse cannot be used together")
+    vim.notify("Error: -toggle and -reuse cannot be used together", vim.log.levels.WARN, { title = "Aibo" })
     return
   end
 
+  local original_winid = vim.api.nvim_get_current_win()
+
   -- Use appropriate behavior based on options
-  local console = require("aibo.internal.console")
+  local console = require("aibo.internal.console_window")
+  local console_options = {
+    opener = opener,
+  }
   if toggle then
-    console.toggle(cmd, cmd_args, opener, stay)
+    console.toggle_or_open(cmd, cmd_args, console_options)
   elseif reuse then
-    console.reuse(cmd, cmd_args, opener, stay)
+    console.focus_or_open(cmd, cmd_args, console_options)
   else
-    console.open(cmd, cmd_args, opener, stay)
+    console.open(cmd, cmd_args, console_options)
+  end
+  if stay then
+    vim.api.nvim_set_current_win(original_winid)
   end
 end
 
@@ -171,7 +169,11 @@ function M.setup()
   vim.api.nvim_create_user_command("Aibo", function(cmd_opts)
     local args = cmd_opts.fargs
     if #args == 0 then
-      vim.api.nvim_err_writeln("Usage: :Aibo [-opener=<opener>] [-stay] [-toggle|-reuse] <cmd> [args...]")
+      vim.notify(
+        "Usage: :Aibo [-opener=<opener>] [-stay] [-toggle|-reuse] <cmd> [args...]",
+        vim.log.levels.INFO,
+        { title = "Aibo" }
+      )
       return
     end
 
@@ -193,13 +195,20 @@ function M.setup()
     local reuse = options.reuse or false
 
     if opener == "" then
-      vim.api.nvim_err_writeln("Usage: :Aibo [-opener=<opener>] [-stay] [-toggle|-reuse] <cmd> [args...]")
-      vim.api.nvim_err_writeln("Example: :Aibo -opener=vsplit -stay ollama run llama3.2")
+      vim.notify(
+        "Usage: :Aibo [-opener=<opener>] [-stay] [-toggle|-reuse] <cmd> [args...]\nExample: :Aibo -opener=vsplit -stay ollama run llama3.2",
+        vim.log.levels.INFO,
+        { title = "Aibo" }
+      )
       return
     end
 
     if #remaining == 0 then
-      vim.api.nvim_err_writeln("Usage: :Aibo [-opener=<opener>] [-stay] [-toggle|-reuse] <cmd> [args...]")
+      vim.notify(
+        "Usage: :Aibo [-opener=<opener>] [-stay] [-toggle|-reuse] <cmd> [args...]",
+        vim.log.levels.INFO,
+        { title = "Aibo" }
+      )
       return
     end
 

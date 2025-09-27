@@ -30,14 +30,14 @@ role as your AI companion in Neovim. While optimized for AI tools, it also
 works with any interactive CLI application.
 
 The plugin creates a split-window interface with:
-- A terminal console where AI agents or other tools run
+- A terminal console where AI tools or other CLI programs run
 - A dedicated prompt buffer for user input
 - Smart key mappings for efficient interaction
 
 Key features:
 - Cross-platform support for Neovim
 - Specialized support for AI assistants (Claude, Codex, Ollama)
-- Agent-specific key mappings and completions
+- Tool-specific key mappings and completions
 - Works with Gemini and other AI CLI tools
 - Also works with any interactive CLI tool (REPLs, database clients, etc.)
 - Clean separation between console and prompt
@@ -74,7 +74,7 @@ cleared for your next input.
 WARNING: Key mapping difference~
 To prevent unintended interrupts from the Vimmer's habit of hitting <Esc>
 repeatedly, <Esc> is NOT mapped in Aibo buffers. Instead:
-  - Use <C-c> to send <Esc> to the AI agent (works in both normal and insert mode)
+  - Use <C-c> to send <Esc> to the AI tool (works in both normal and insert mode)
   - Use g<C-c> to send the interrupt signal (original <C-c> behavior, normal mode only)
 
 Tip: When focused on the console window, entering insert mode automatically
@@ -128,7 +128,7 @@ The setup function can be called multiple times to update configuration:
 
 	-- Can be called again later to update configuration
 	require('aibo').setup({
-	  agents = {
+	  tools = {
 	    claude = {
 	      no_default_mappings = true,
 	    },
@@ -145,7 +145,7 @@ Full configuration structure:
 	      -- Called when prompt buffer is created
 	      -- Runs AFTER ftplugin files are loaded
 	      -- info.type = "prompt"
-	      -- info.agent = agent name
+	      -- info.tool = tool name
 	      -- info.aibo = aibo instance
 	    end,
 	  },
@@ -159,8 +159,8 @@ Full configuration structure:
 	    end,
 	  },
 
-	  -- Agent-specific overrides
-	  agents = {
+	  -- Tool-specific overrides
+	  tools = {
 	    claude = {
 	      no_default_mappings = false,
 	      on_attach = function(bufnr, info)
@@ -203,7 +203,7 @@ Example: Customize prompt buffer mappings
 <
 Example: Add leader-based mappings for Claude
 >
-	-- ~/.config/nvim/after/ftplugin/aibo-agent-claude.lua
+	-- ~/.config/nvim/after/ftplugin/aibo-tool-claude.lua
 	local bufnr = vim.api.nvim_get_current_buf()
 
 	-- Add leader-based mappings
@@ -252,14 +252,14 @@ Set `no_default_mappings = true` to disable default key mappings:
 	  },
 	})
 <
-						*aibo-agent-specific*
-Agent-specific configuration~
+						*aibo-tool-specific*
+Tool-specific configuration~
 
-Configure agent-specific behavior through the setup function. Agent-specific
+Configure tool-specific behavior through the setup function. Tool-specific
 configurations have higher priority than buffer type configurations:
 >
 	require('aibo').setup({
-	  agents = {
+	  tools = {
 	    claude = {
 	      no_default_mappings = true,
 	      on_attach = function(bufnr, info)
@@ -275,18 +275,18 @@ configurations have higher priority than buffer type configurations:
 						*aibo-callback-order*
 Callback Order~
 
-When both buffer type and agent-specific `on_attach` callbacks are defined,
+When both buffer type and tool-specific `on_attach` callbacks are defined,
 both are called in this order:
 
 1. Buffer type on_attach (e.g., prompt.on_attach)
-2. Agent-specific on_attach (e.g., agents.claude.on_attach)
-						*aibo-custom-agents*
-Adding custom agents~
+2. Tool-specific on_attach (e.g., tools.claude.on_attach)
+						*aibo-custom-tools*
+Adding custom tools~
 
-Define new agents with their own configuration:
+Define new tools with their own configuration:
 >
 	require('aibo').setup({
-	  agents = {
+	  tools = {
 	    myai = {
 	      no_default_mappings = false,
 	      on_attach = function(bufnr, info)
@@ -535,17 +535,17 @@ aibo.get_config()
 	Returns:~
 		Configuration table
 
-						*aibo.get_agent_config()*
-aibo.get_agent_config({agent})
-	Get configuration for a specific agent.
+						*aibo.get_tool_config()*
+aibo.get_tool_config({tool})
+	Get configuration for a specific tool.
 >
-		local cfg = require('aibo').get_agent_config('claude')
+		local cfg = require('aibo').get_tool_config('claude')
 <
 	Parameters:~
-		{agent}    Agent name (e.g., "claude", "codex")
+		{tool}    Tool name (e.g., "claude", "codex")
 
 	Returns:~
-		Agent configuration table
+		Tool configuration table
 
 						*aibo.get_buffer_config()*
 aibo.get_buffer_config({buftype})
@@ -582,7 +582,7 @@ Prompt buffer mappings:
 	:w		Submit content (command)
 	:wq		Submit and close (command)
 
-Claude agent mappings:
+Claude tool mappings:
 	<S-Tab>		Switch mode (n/i)
 	<F2>		Switch mode alternative (n/i)
 	<C-o>		Toggle verbose (n/i)
@@ -593,7 +593,7 @@ Claude agent mappings:
 	!		Enter bash mode (n)
 	#		Memorize context (n)
 
-Codex agent mappings:
+Codex tool mappings:
 	<C-t>		Show transcript (n/i)
 	<Home>		Move to beginning (n/i)
 	<End>		Move to end (n/i)
@@ -615,8 +615,8 @@ Prompt buffer <Plug> mappings~
 
 	<Plug>(aibo-prompt-submit)		Submit prompt
 	<Plug>(aibo-prompt-submit-close)	Submit and close
-	<Plug>(aibo-prompt-esc)			Send ESC to agent
-	<Plug>(aibo-prompt-interrupt)		Interrupt agent
+	<Plug>(aibo-prompt-esc)			Send ESC to tool
+	<Plug>(aibo-prompt-interrupt)		Interrupt tool
 	<Plug>(aibo-prompt-clear)		Clear screen
 	<Plug>(aibo-prompt-next)		Next history
 	<Plug>(aibo-prompt-prev)		Previous history
@@ -628,8 +628,8 @@ Console buffer <Plug> mappings~
 
 	<Plug>(aibo-console-submit)		Submit empty message
 	<Plug>(aibo-console-close)		Close console
-	<Plug>(aibo-console-esc)		Send ESC to agent
-	<Plug>(aibo-console-interrupt)		Interrupt agent
+	<Plug>(aibo-console-esc)		Send ESC to tool
+	<Plug>(aibo-console-interrupt)		Interrupt tool
 	<Plug>(aibo-console-clear)		Clear screen
 	<Plug>(aibo-console-next)		Next history
 	<Plug>(aibo-console-prev)		Previous history
@@ -637,7 +637,7 @@ Console buffer <Plug> mappings~
 	<Plug>(aibo-console-up)			Move up
 
 						*aibo-plug-claude*
-Claude agent <Plug> mappings~
+Claude tool <Plug> mappings~
 
 	<Plug>(aibo-claude-mode)		Toggle mode
 	<Plug>(aibo-claude-verbose)		Toggle verbose
@@ -649,7 +649,7 @@ Claude agent <Plug> mappings~
 	<Plug>(aibo-claude-memorize)		Memorize context
 
 						*aibo-plug-codex*
-Codex agent <Plug> mappings~
+Codex tool <Plug> mappings~
 
 	<Plug>(aibo-codex-transcript)		Show transcript
 	<Plug>(aibo-codex-home)			Home
@@ -718,18 +718,18 @@ Supported key formats:
 =============================================================================
 HEALTH CHECK					*aibo-health*
 
-Run `:checkhealth aibo` to diagnose your aibo.nvim installation.
+Run `:checkhealth aibo` to diagnose your aibo installation.
 
 The health check will verify:
 - Neovim version compatibility (0.10.0+)
 - Plugin installation status
 - Configuration loading
-- Available AI agent CLI tools
+- Available AI tool CLI tools
 - Terminal feature support
 - Ftplugin file presence
 
 This is useful for troubleshooting issues with the plugin or verifying that
-your environment is properly configured for using aibo.nvim.
+your environment is properly configured for using aibo.
 
 =============================================================================
 FAQ						*aibo-faq*
@@ -740,7 +740,7 @@ A: The plugin uses modern Lua APIs and terminal features introduced in
 
 Q: Can I use aibo with any AI tool?
 A: Yes! Aibo is designed for AI assistants and provides specialized support
-   for Claude, Codex, and Ollama with agent-specific key mappings and smart
+   for Claude, Codex, and Ollama with tool-specific key mappings and smart
    completions. It also works with Gemini and any other command-line AI tool
    that accepts text input via stdin and provides output via stdout.
 
@@ -767,8 +767,8 @@ A: Some key combinations like <C-Enter> and <S-Tab> require modern terminal
    don't work in your terminal.
 
 Q: Can I have multiple AI sessions open?
-A: Yes, you can have multiple sessions with different agents or multiple
-   instances of the same agent.
+A: Yes, you can have multiple sessions with different tools or multiple
+   instances of the same tool.
 
 Q: How do I terminate an AI session?
 A: Use `:bdelete!` or `:bwipeout!` on the console buffer. The exclamation

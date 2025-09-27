@@ -131,6 +131,12 @@ local function parse_command(cmdline)
   return parts
 end
 
+---Check if ollama command is available
+---@return boolean
+function M.is_available()
+  return vim.fn.executable("ollama") == 1
+end
+
 ---Get completion candidates for Ollama command arguments
 ---@param arglead string Current argument being typed
 ---@param cmdline string Full command line
@@ -189,38 +195,6 @@ function M.get_command_completions(arglead, cmdline, _cursorpos)
   end
 
   return completions
-end
-
----Check if ollama command is available
----@return boolean
-function M.is_available()
-  return vim.fn.executable("ollama") == 1
-end
-
----Get help text for Ollama arguments
----@return string[]
-function M.get_help()
-  local help = {}
-  table.insert(help, "Ollama usage for interactive sessions:")
-  table.insert(help, "")
-  table.insert(help, "Basic usage:")
-  table.insert(help, "  :Aibo ollama run <model>")
-  table.insert(help, "")
-  table.insert(help, "Models are auto-completed from locally installed models.")
-  table.insert(help, "Use 'ollama pull <model>' to install new models.")
-  table.insert(help, "")
-  table.insert(help, "Options:")
-  for _, arg_info in ipairs(OLLAMA_ARGUMENTS) do
-    if not arg_info.is_subcommand then
-      local line = string.format("  %-20s %s", arg_info.arg, arg_info.description)
-      if arg_info.values then
-        line = line .. " [" .. table.concat(arg_info.values, ", ") .. "]"
-      end
-      table.insert(help, line)
-    end
-  end
-
-  return help
 end
 
 return M

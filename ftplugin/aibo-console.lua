@@ -15,9 +15,6 @@ vim.wo.signcolumn = "no"
 vim.keymap.set("n", "o", "i", { buffer = bufnr, desc = "Enter insert mode" })
 vim.keymap.set("n", "O", "i", { buffer = bufnr, desc = "Enter insert mode" })
 
--- Setup <Plug> mappings from console module
-require("aibo.internal.console").setup_plug_mappings(bufnr)
-
 -- Default key mappings (unless disabled in config)
 local cfg = aibo.get_buffer_config("console")
 if not (cfg and cfg.no_default_mappings) then
@@ -33,3 +30,4 @@ if not (cfg and cfg.no_default_mappings) then
   vim.keymap.set("n", "<Down>", "<Plug>(aibo-console-down)", { buffer = bufnr, nowait = true })
   vim.keymap.set("n", "<Up>", "<Plug>(aibo-console-up)", { buffer = bufnr, nowait = true })
 end
+

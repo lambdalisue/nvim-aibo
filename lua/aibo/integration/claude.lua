@@ -227,28 +227,10 @@ function M.get_command_completions(arglead, cmdline, _cursorpos)
   return completions
 end
 
----Check if claude command is available
----@return boolean
+----Check if claude command is available
+----@return boolean
 function M.is_available()
   return vim.fn.executable("claude") == 1
-end
-
----Get help text for Claude arguments
----@return string[]
-function M.get_help()
-  local help = {}
-  table.insert(help, "Claude arguments for interactive sessions:")
-  table.insert(help, "")
-
-  for _, arg_info in ipairs(CLAUDE_ARGUMENTS) do
-    local line = string.format("  %-25s %s", arg_info.arg, arg_info.description)
-    if arg_info.values then
-      line = line .. " [" .. table.concat(arg_info.values, ", ") .. "]"
-    end
-    table.insert(help, line)
-  end
-
-  return help
 end
 
 ---Run health check for Claude integration
@@ -284,49 +266,46 @@ end
 
 ---Setup Claude <Plug> mappings
 ---@param bufnr number Buffer number to set mappings for
-function M.setup_plug_mappings(bufnr)
+function M.setup_mappings(bufnr)
   local aibo = require("aibo")
 
-  local CLAUDE_CODES = {
-    mode = "\027[Z",
-    verbose = "\015",
-    todo = "\020",
-    undo = "\031",
-    paste = "\022",
-  }
+  local define = function(lhs, desc, rhs)
+    vim.keymap.set({ "n", "i" }, lhs, rhs, {
+      buffer = bufnr,
+      desc = desc,
+      silent = true,
+    })
+  end
 
-  -- Define <Plug> mappings for Claude functionality
-  vim.keymap.set({ "n", "i" }, "<Plug>(aibo-claude-mode)", function()
-    aibo.send(CLAUDE_CODES.mode, bufnr)
-  end, { buffer = bufnr, desc = "Toggle mode (Shift+Tab)" })
+  local send = function(key)
+    local code = aibo.termcode.resolve(key)
+    aibo.send(code, bufnr)
+  end
 
-  vim.keymap.set({ "n", "i" }, "<Plug>(aibo-claude-verbose)", function()
-    aibo.send(CLAUDE_CODES.verbose, bufnr)
-  end, { buffer = bufnr, desc = "Verbose (Ctrl+O)" })
-
-  vim.keymap.set({ "n", "i" }, "<Plug>(aibo-claude-todo)", function()
-    aibo.send(CLAUDE_CODES.todo, bufnr)
-  end, { buffer = bufnr, desc = "Todo (Ctrl+T)" })
-
-  vim.keymap.set({ "n", "i" }, "<Plug>(aibo-claude-undo)", function()
-    aibo.send(CLAUDE_CODES.undo, bufnr)
-  end, { buffer = bufnr, desc = "Undo (Ctrl+Y)" })
-
-  vim.keymap.set({ "n", "i" }, "<Plug>(aibo-claude-paste)", function()
-    aibo.send(CLAUDE_CODES.paste, bufnr)
-  end, { buffer = bufnr, desc = "Paste (Ctrl+V)" })
-
-  vim.keymap.set({ "n", "i" }, "<Plug>(aibo-claude-shortcuts)", function()
-    aibo.send("?", bufnr)
-  end, { buffer = bufnr, desc = "Shortcuts (?)" })
-
-  vim.keymap.set({ "n", "i" }, "<Plug>(aibo-claude-bash-mode)", function()
-    aibo.send("!", bufnr)
-  end, { buffer = bufnr, desc = "Bash mode (!)" })
-
-  vim.keymap.set({ "n", "i" }, "<Plug>(aibo-claude-memorize)", function()
-    aibo.send("#", bufnr)
-  end, { buffer = bufnr, desc = "Memorize (#)" })
+  define("<Plug>(aibo-claude-mode)", "Toggle mode (Shift+Tab)", function()
+    send("<S-Tab>")
+  end)
+  define("<Plug>(aibo-claude-verbose)", "Verbose (Ctrl+O)", function()
+    send("<C-o>")
+  end)
+  define("<Plug>(aibo-claude-todo)", "Todo (Ctrl+T)", function()
+    send("<C-t>")
+  end)
+  define("<Plug>(aibo-claude-undo)", "Undo (Ctrl+Y)", function()
+    send("<C-y>")
+  end)
+  define("<Plug>(aibo-claude-paste)", "Paste (Ctrl+V)", function()
+    send("<C-v>")
+  end)
+  define("<Plug>(aibo-claude-shortcuts)", "Shortcuts (?)", function()
+    send("?")
+  end)
+  define("<Plug>(aibo-claude-bash-mode)", "Bash mode (!)", function()
+    send("!")
+  end)
+  define("<Plug>(aibo-claude-memorize)", "Memorize (#)", function()
+    send("#")
+  end)
 end
 
 return M

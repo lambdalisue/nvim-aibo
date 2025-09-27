@@ -10,9 +10,7 @@ local aibo = require("aibo")
 vim.wo.number = false
 vim.wo.relativenumber = false
 vim.wo.signcolumn = "no"
-
--- Setup <Plug> mappings from prompt module
-require("aibo.internal.prompt").setup_plug_mappings(bufnr)
+vim.wo.winfixheight = true
 
 -- Default key mappings (unless disabled in config)
 local cfg = aibo.get_buffer_config("prompt")

@@ -1,36 +1,33 @@
 -- Tests for Ollama integration (lua/aibo/integration/ollama.lua)
 
-local helpers = require("tests.helpers")
+local mock = require("tests.mock")
 local T = require("mini.test")
 
 -- Test set
 local test_set = T.new_set({
   hooks = {
-    pre_case = function()
-      helpers.setup()
-    end,
     post_case = function()
-      helpers.cleanup()
+      vim.cmd("silent! %bwipeout!")
     end,
   },
 })
 
--- Test Ollama command availability
+-- Test Ollama is_available
 test_set["Ollama is_available"] = function()
   local ollama = require("aibo.integration.ollama")
 
-  -- Mock executable
-  local restore = helpers.mock_executable({
+  -- Mock executable using mock.lua
+  local restore = mock.mock_executable({
     ollama = true,
   })
 
-  T.expect.equality(ollama.is_available(), true)
+  T.expect.equality(ollama.is_available(), true, "Should be available when ollama exists")
 
   -- Test when not available
   vim.fn.executable = function()
     return 0
   end
-  T.expect.equality(ollama.is_available(), false)
+  T.expect.equality(ollama.is_available(), false, "Should not be available when ollama missing")
 
   restore()
 end
@@ -60,7 +57,7 @@ test_set["Ollama model completions"] = function()
   local ollama = require("aibo.integration.ollama")
 
   -- Mock ollama list output
-  local restore = helpers.mock_system({
+  local restore = mock.mock_system({
     ["ollama list"] = {
       result = [[NAME                  ID              SIZE      MODIFIED
 llama3:latest         abc123          5.5 GB    2 days ago
@@ -95,7 +92,7 @@ test_set["Ollama flag completions"] = function()
   local ollama = require("aibo.integration.ollama")
 
   -- Mock ollama list for models
-  local restore = helpers.mock_system({
+  local restore = mock.mock_system({
     ["ollama list"] = {
       result = "NAME ID SIZE MODIFIED\nllama3:latest abc123 5.5GB 2 days ago",
       error = 0,
@@ -127,7 +124,7 @@ test_set["Ollama flag value completions"] = function()
   local ollama = require("aibo.integration.ollama")
 
   -- Mock ollama list to avoid executing ollama
-  local restore = helpers.mock_system({
+  local restore = mock.mock_system({
     ["ollama list"] = {
       result = "NAME ID SIZE MODIFIED\nllama3:latest abc123 5.5GB 2 days ago",
       error = 0,
@@ -166,7 +163,7 @@ test_set["Ollama no models available"] = function()
   local ollama = require("aibo.integration.ollama")
 
   -- Mock empty ollama list
-  local restore = helpers.mock_system({
+  local restore = mock.mock_system({
     ["ollama list"] = {
       result = "NAME ID SIZE MODIFIED\n",
       error = 0,
@@ -179,21 +176,6 @@ test_set["Ollama no models available"] = function()
   T.expect.equality(vim.tbl_contains(completions, "--verbose"), true)
 
   restore()
-end
-
--- Test Ollama help text
-test_set["Ollama help text"] = function()
-  local ollama = require("aibo.integration.ollama")
-
-  local help = ollama.get_help()
-  T.expect.equality(#help > 0, true)
-
-  -- Check for key content
-  local help_text = table.concat(help, "\n")
-  T.expect.equality(help_text:match("Ollama usage") ~= nil, true)
-  T.expect.equality(help_text:match("run") ~= nil, true)
-  T.expect.equality(help_text:match("--format") ~= nil, true)
-  T.expect.equality(help_text:match("--verbose") ~= nil, true)
 end
 
 return test_set

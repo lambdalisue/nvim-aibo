@@ -1,16 +1,13 @@
 -- Tests for Claude integration (lua/aibo/integration/claude.lua)
 
-local helpers = require("tests.helpers")
+local mock = require("tests.mock")
 local T = require("mini.test")
 
 -- Test set
 local test_set = T.new_set({
   hooks = {
-    pre_case = function()
-      helpers.setup()
-    end,
     post_case = function()
-      helpers.cleanup()
+      vim.cmd("silent! %bwipeout!")
     end,
   },
 })
@@ -20,7 +17,7 @@ test_set["Claude is_available"] = function()
   local claude = require("aibo.integration.claude")
 
   -- Mock executable
-  local restore = helpers.mock_executable({
+  local restore = mock.mock_executable({
     claude = true,
   })
 
@@ -77,6 +74,52 @@ test_set["Claude model value completions"] = function()
   T.expect.equality(#completions == 0, true) -- Short form not recognized for --model
 end
 
+-- Test Claude check_health function
+test_set["Claude check_health"] = function()
+  local claude = require("aibo.integration.claude")
+
+  -- Mock reporter
+  local reports = {}
+  local reporter = {
+    start = function(msg)
+      table.insert(reports, { type = "start", msg = msg })
+    end,
+    ok = function(msg)
+      table.insert(reports, { type = "ok", msg = msg })
+    end,
+    warn = function(msg)
+      table.insert(reports, { type = "warn", msg = msg })
+    end,
+    info = function(msg)
+      table.insert(reports, { type = "info", msg = msg })
+    end,
+  }
+
+  -- Mock executable
+  local restore = mock.mock_executable({
+    claude = true,
+  })
+
+  -- Run health check
+  claude.check_health(reporter)
+
+  -- Check that appropriate messages were reported
+  T.expect.equality(reports[1].type, "start")
+  T.expect.equality(reports[1].msg:find("Claude") ~= nil, true)
+
+  -- Should report that claude is found
+  local has_ok_report = false
+  for _, report in ipairs(reports) do
+    if report.type == "ok" and report.msg:find("claude") then
+      has_ok_report = true
+      break
+    end
+  end
+  T.expect.equality(has_ok_report, true, "Should report claude is available")
+
+  restore()
+end
+
 -- Test Claude permission mode completions
 test_set["Claude permission-mode value completions"] = function()
   local claude = require("aibo.integration.claude")
@@ -120,21 +163,6 @@ test_set["Claude file and directory completions"] = function()
   T.expect.equality(vim.tbl_contains(completions, "settings.json"), true)
 
   vim.fn.getcompletion = original_getcompletion
-end
-
--- Test Claude help text
-test_set["Claude help text"] = function()
-  local claude = require("aibo.integration.claude")
-
-  local help = claude.get_help()
-  T.expect.equality(#help > 0, true)
-
-  -- Check for key content
-  local help_text = table.concat(help, "\n")
-  T.expect.equality(help_text:match("Claude arguments") ~= nil, true)
-  T.expect.equality(help_text:match("--continue") ~= nil, true)
-  T.expect.equality(help_text:match("--model") ~= nil, true)
-  T.expect.equality(help_text:match("sonnet") ~= nil, true)
 end
 
 return test_set

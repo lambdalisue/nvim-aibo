@@ -16,8 +16,8 @@ globals = {
 
 -- Ignore some warnings
 ignore = {
-  "122",   -- Setting read-only field (false positive for vim.bo, vim.wo, vim.b in Neovim)
-  "631",   -- Line too long
+  "122", -- Setting read-only field (false positive for vim.bo, vim.wo, vim.b in Neovim)
+  "631", -- Line too long
 }
 
 -- Set max line length
@@ -28,8 +28,10 @@ files = {
   ["lua/**/*.lua"] = {
     std = "+busted",
   },
+  ["plugin/**/*.lua"] = {
+    std = "+busted",
+  },
   ["ftplugin/**/*.lua"] = {
     std = "+busted",
   },
 }
-

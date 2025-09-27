@@ -1,22 +1,12 @@
 -- Tests for plugin setup and loading (plugin/aibo.lua)
 
-local helpers = require("tests.helpers")
 local T = require("mini.test")
 
 -- Test set
 local test_set = T.new_set({
   hooks = {
-    pre_case = function()
-      helpers.setup()
-      -- Reload the plugin to ensure commands are created
-      vim.cmd("runtime plugin/aibo.lua")
-    end,
     post_case = function()
-      -- Clear any mocked modules to avoid interfering with other tests
-      package.loaded["aibo.integration.claude"] = nil
-      package.loaded["aibo.integration.codex"] = nil
-      package.loaded["aibo.integration.ollama"] = nil
-      helpers.cleanup()
+      vim.cmd("silent! %bwipeout!")
     end,
   },
 })
@@ -43,32 +33,19 @@ test_set["Aibo command exists"] = function()
   vim.cmd("runtime plugin/aibo.lua")
 
   local commands = vim.api.nvim_get_commands({})
-  T.expect.equality(commands["Aibo"] ~= nil, true)
-  T.expect.equality(commands["Aibo"].nargs, "+")
+  T.expect.equality(commands["Aibo"] ~= nil, true, "Aibo command should exist")
+  T.expect.equality(commands["Aibo"].nargs, "+", "Aibo should accept 1+ args")
 end
 
--- Test aiboprompt autocmd
-test_set["aiboprompt autocmd"] = function()
+-- Test AiboSend command existence
+test_set["AiboSend command exists"] = function()
   vim.g.loaded_aibo = nil
   vim.cmd("runtime plugin/aibo.lua")
 
-  -- Check that autocmd is created
-  local autocmds = vim.api.nvim_get_autocmds({
-    group = "aibo_plugin",
-    event = "BufReadCmd",
-  })
-
-  T.expect.equality(#autocmds > 0, true)
-
-  -- Find the aiboprompt autocmd
-  local found = false
-  for _, autocmd in ipairs(autocmds) do
-    if autocmd.pattern == "aiboprompt://*" then
-      found = true
-      break
-    end
-  end
-  T.expect.equality(found, true)
+  local commands = vim.api.nvim_get_commands({})
+  T.expect.equality(commands["AiboSend"] ~= nil, true, "AiboSend command should exist")
+  T.expect.equality(commands["AiboSend"].nargs, "*", "AiboSend should accept 0+ args")
+  T.expect.equality(commands["AiboSend"].range ~= nil, true, "AiboSend should support range")
 end
 
 return test_set
