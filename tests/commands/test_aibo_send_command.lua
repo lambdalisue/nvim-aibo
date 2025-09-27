@@ -578,4 +578,302 @@ test_set["AiboSend -replace with range"] = function()
   vim.api.nvim_win_close(console_win, true)
 end
 
+-- Test AiboSend with -submit option alone
+test_set["AiboSend -submit option"] = function()
+  -- Create a mock console buffer
+  local console_buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_name(console_buf, "aiboconsole://test//submit")
+  vim.bo[console_buf].filetype = "aibo-console"
+  vim.b[console_buf].aibo = {
+    cmd = "test",
+    args = {},
+  }
+
+  -- Open console in a new tab
+  vim.cmd("tabedit")
+  vim.api.nvim_set_current_buf(console_buf)
+  local console_win = vim.api.nvim_get_current_win()
+  vim.cmd("wincmd p")
+
+  -- Create the prompt window for the console first
+  local prompt = require("aibo.internal.prompt_window")
+  prompt.open(console_win)
+
+  -- Mock prompt.submit to track if it was called
+  local original_submit = prompt.submit
+  local submit_called = false
+  local submit_bufnr = nil
+  prompt.submit = function(bufnr)
+    submit_called = true
+    submit_bufnr = bufnr
+    -- Don't actually submit to avoid errors
+  end
+
+  -- Create a test buffer with content
+  local test_buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_set_current_buf(test_buf)
+  vim.api.nvim_buf_set_lines(test_buf, 0, -1, false, { "test line" })
+
+  -- Run AiboSend with -submit
+  vim.cmd("AiboSend -submit")
+
+  -- Check that submit was called
+  T.expect.equality(submit_called, true, "Submit should be called with -submit option")
+
+  -- Restore
+  prompt.submit = original_submit
+
+  -- Clean up
+  vim.api.nvim_win_close(console_win, true)
+end
+
+-- Test M.setup creates the command
+test_set["AiboSend setup creates command"] = function()
+  local aibo_send = require("aibo.command.aibo_send")
+
+  -- Clear any existing command
+  pcall(vim.api.nvim_del_user_command, "AiboSend")
+
+  -- Setup should create the command
+  aibo_send.setup()
+
+  -- Check command exists
+  local commands = vim.api.nvim_get_commands({})
+  T.expect.equality(commands["AiboSend"] ~= nil, true, "Should create AiboSend command")
+
+  if commands["AiboSend"] then
+    T.expect.equality(commands["AiboSend"].nargs, "*", "Should accept any number of arguments")
+    T.expect.equality(commands["AiboSend"].range, ".", "Should support range")
+  end
+end
+
+-- Test AiboSend with empty buffer
+test_set["AiboSend with empty buffer"] = function()
+  -- Create a mock console buffer
+  local console_buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_name(console_buf, "aiboconsole://test//empty")
+  vim.bo[console_buf].filetype = "aibo-console"
+  vim.b[console_buf].aibo = {
+    cmd = "test",
+    args = {},
+  }
+
+  -- Open console in a new tab
+  vim.cmd("tabedit")
+  vim.api.nvim_set_current_buf(console_buf)
+  local console_win = vim.api.nvim_get_current_win()
+  vim.cmd("wincmd p")
+
+  -- Create the prompt window for the console
+  local prompt = require("aibo.internal.prompt_window")
+  prompt.open(console_win)
+
+  -- Create an empty test buffer
+  local test_buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_set_current_buf(test_buf)
+  -- Buffer is empty by default
+
+  -- Run AiboSend
+  vim.cmd("AiboSend")
+
+  -- Get prompt buffer
+  local prompt_bufname = string.format("aiboprompt://%d", console_win)
+  local prompt_buf = vim.fn.bufnr(prompt_bufname)
+
+  -- Check that empty content was sent
+  if prompt_buf ~= -1 then
+    local prompt_lines = vim.api.nvim_buf_get_lines(prompt_buf, 0, -1, false)
+    T.expect.equality(#prompt_lines, 1, "Should have one line for empty buffer")
+    T.expect.equality(prompt_lines[1], "", "Should send empty string for empty buffer")
+  end
+
+  -- Clean up
+  vim.api.nvim_win_close(console_win, true)
+end
+
+-- Test AiboSend with multiple console windows (selection)
+test_set["AiboSend with multiple consoles"] = function()
+  -- Create two mock console buffers
+  local console_buf1 = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_name(console_buf1, "aiboconsole://claude/multi1/")
+  vim.bo[console_buf1].filetype = "aibo-console"
+  vim.b[console_buf1].aibo = { cmd = "claude", args = { "multi1" } }
+
+  local console_buf2 = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_name(console_buf2, "aiboconsole://codex/multi2/")
+  vim.bo[console_buf2].filetype = "aibo-console"
+  vim.b[console_buf2].aibo = { cmd = "codex", args = { "multi2" } }
+
+  -- Open consoles in a new tab
+  vim.cmd("tabedit")
+  vim.api.nvim_set_current_buf(console_buf1)
+  local console_win1 = vim.api.nvim_get_current_win()
+
+  vim.cmd("vsplit")
+  vim.api.nvim_set_current_buf(console_buf2)
+  local console_win2 = vim.api.nvim_get_current_win()
+
+  -- Create prompts for both consoles
+  local prompt = require("aibo.internal.prompt_window")
+  prompt.open(console_win1)
+  prompt.open(console_win2)
+
+  -- Create a test buffer in a new horizontal split
+  -- Make sure we stay in the same tab
+  vim.cmd("split")
+  local test_buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_set_current_buf(test_buf)
+  vim.api.nvim_buf_set_lines(test_buf, 0, -1, false, { "multi test" })
+
+  -- Verify console windows are still in the current tabpage
+  local tab_wins = vim.api.nvim_tabpage_list_wins(0)
+  local console1_found = vim.tbl_contains(tab_wins, console_win1)
+  local console2_found = vim.tbl_contains(tab_wins, console_win2)
+
+  -- Mock vim.ui.select to track what was selected
+  local select_called = false
+  local selected_item = nil
+  local items_count = 0
+  local original_select = vim.ui.select
+  vim.ui.select = function(items, opts, on_choice)
+    select_called = true
+    items_count = items and #items or 0
+    -- Store what would be selected (first item)
+    selected_item = items and items[1] or nil
+    -- Call the original mock (which selects first item)
+    original_select(items, opts, on_choice)
+  end
+
+  -- Debug: Check what console.find_info_in_tabpage would find
+  local console = require("aibo.internal.console_window")
+  local found_consoles = {}
+  for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+    local info = console.get_info_by_winid(winid)
+    if info then
+      table.insert(found_consoles, info)
+    end
+  end
+  local found_count = #found_consoles
+
+  -- Run AiboSend
+  vim.cmd("AiboSend")
+
+  -- Restore original select
+  vim.ui.select = original_select
+
+  -- Verify we found consoles
+  T.expect.equality(found_count >= 1, true, string.format("Should find at least 1 console (found %d)", found_count))
+
+  -- First check if select was even called
+  if not select_called then
+    -- Debug: Check if the console windows are valid and in current tabpage
+    T.expect.equality(found_count, 2, string.format("Should find 2 consoles in tabpage (found %d)", found_count))
+    T.expect.equality(console1_found, true, "Console window 1 should be in current tabpage")
+    T.expect.equality(console2_found, true, "Console window 2 should be in current tabpage")
+
+    local console = require("aibo.internal.console_window")
+    local console_info1 = console.get_info_by_winid(console_win1)
+    local console_info2 = console.get_info_by_winid(console_win2)
+
+    -- Verify console windows are recognized
+    T.expect.equality(console_info1 ~= nil, true, "Console 1 should be recognized")
+    T.expect.equality(console_info2 ~= nil, true, "Console 2 should be recognized")
+
+    -- If select wasn't called, check if prompts were created correctly
+    local prompt = require("aibo.internal.prompt_window")
+    local prompt_info1 = prompt.get_info_by_console_winid(console_win1)
+    local prompt_info2 = prompt.get_info_by_console_winid(console_win2)
+    T.expect.equality(prompt_info1 ~= nil, true, "Should have prompt for console 1")
+    T.expect.equality(prompt_info2 ~= nil, true, "Should have prompt for console 2")
+
+    -- Since selection wasn't triggered, we should at least verify prompts exist
+    -- and content was sent to one of them
+    local any_prompt_has_content = false
+    if prompt_info1 then
+      local lines1 = vim.api.nvim_buf_get_lines(prompt_info1.bufnr, 0, -1, false)
+      if #lines1 > 0 and lines1[1] == "multi test" then
+        any_prompt_has_content = true
+      end
+    end
+    if prompt_info2 and not any_prompt_has_content then
+      local lines2 = vim.api.nvim_buf_get_lines(prompt_info2.bufnr, 0, -1, false)
+      if #lines2 > 0 and lines2[1] == "multi test" then
+        any_prompt_has_content = true
+      end
+    end
+    T.expect.equality(any_prompt_has_content, true, "Content should be sent to a prompt")
+  else
+    -- Check that selection was made (claude console was selected - first item)
+    T.expect.equality(select_called, true, "vim.ui.select should have been called")
+    T.expect.equality(items_count > 0, true, string.format("Should have items to select from (got %d)", items_count))
+    T.expect.equality(selected_item ~= nil, true, "Should have selected an item")
+    if selected_item then
+      -- The selected item is a console info object with bufname
+      -- Check if it's the claude console (should be first item alphabetically)
+      local is_claude = selected_item.bufname:match("^aiboconsole://claude") ~= nil
+      T.expect.equality(is_claude, true, "Should have selected claude console (first item)")
+    end
+  end
+
+  -- Check that content was sent to the selected console (first one - claude)
+  local prompt_bufname1 = string.format("aiboprompt://%d", console_win1)
+  local prompt_buf1 = vim.fn.bufnr(prompt_bufname1)
+  if prompt_buf1 ~= -1 then
+    local prompt_lines = vim.api.nvim_buf_get_lines(prompt_buf1, 0, -1, false)
+    T.expect.equality(#prompt_lines, 1)
+    T.expect.equality(prompt_lines[1], "multi test")
+  end
+
+  -- Clean up
+  vim.api.nvim_win_close(console_win1, true)
+  vim.api.nvim_win_close(console_win2, true)
+end
+
+-- Test M.call function directly
+test_set["M.call function with options"] = function()
+  local aibo_send = require("aibo.command.aibo_send")
+
+  -- Create a mock console buffer
+  local console_buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_name(console_buf, "aiboconsole://test//call")
+  vim.bo[console_buf].filetype = "aibo-console"
+  vim.b[console_buf].aibo = { cmd = "test", args = {} }
+
+  -- Open console in a new tab
+  vim.cmd("tabedit")
+  vim.api.nvim_set_current_buf(console_buf)
+  local console_win = vim.api.nvim_get_current_win()
+  vim.cmd("wincmd p")
+
+  -- Create the prompt window for the console
+  local prompt = require("aibo.internal.prompt_window")
+  prompt.open(console_win)
+
+  -- Create a test buffer with content
+  local test_buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_set_current_buf(test_buf)
+  vim.api.nvim_buf_set_lines(test_buf, 0, -1, false, { "line1", "line2", "line3" })
+
+  -- Call M.call directly with options
+  aibo_send.call({
+    line1 = 2,
+    line2 = 3,
+    prefix = ">>> ",
+    suffix = " <<<",
+    replace = false,
+  })
+
+  -- Get prompt buffer and check content
+  local prompt_bufname = string.format("aiboprompt://%d", console_win)
+  local prompt_buf = vim.fn.bufnr(prompt_bufname)
+  if prompt_buf ~= -1 then
+    local prompt_lines = vim.api.nvim_buf_get_lines(prompt_buf, 0, -1, false)
+    local content = table.concat(prompt_lines, "\n")
+    T.expect.equality(content, ">>> line2\nline3 <<<", "Should have prefix, lines 2-3, and suffix")
+  end
+
+  -- Clean up
+  vim.api.nvim_win_close(console_win, true)
+end
+
 return test_set
