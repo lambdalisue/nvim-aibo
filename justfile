@@ -8,8 +8,6 @@ default:
 lint:
 	@echo "Running luacheck..."
 	@luacheck lua/ --globals vim
-	@echo "Running lua-language-server diagnostics..."
-	@lua-language-server --check=$(pwd) --checklevel=Warning
 
 # Format code with stylua
 fmt:

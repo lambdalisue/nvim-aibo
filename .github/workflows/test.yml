@@ -12,10 +12,17 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-        neovim: [stable, nightly]
+        neovim:
+          - v0.10.0
+          - nightly
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install Just command runner
+        uses: taiki-e/install-action@v2
+        with:
+          tool: just
 
       - name: Setup Neovim
         uses: rhysd/action-setup-vim@v1
@@ -28,10 +35,9 @@ jobs:
           mkdir -p ~/.local/share/nvim/site/pack/deps/start
           git clone --filter=blob:none https://github.com/echasnovski/mini.nvim ~/.local/share/nvim/site/pack/deps/start/mini.nvim
 
-      - name: Run tests
-        run: |
-          nvim --version
-          nvim --headless -c "luafile tests/runner.lua" -c "qa!"
+      - run: nvim --version
+
+      - run: just test
 
       - name: Upload test results
         if: always()
@@ -40,3 +46,4 @@ jobs:
           name: test-results-${{ matrix.os }}-${{ matrix.neovim }}
           path: test-results.log
           retention-days: 7
+
