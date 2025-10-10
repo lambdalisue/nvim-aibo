@@ -16,37 +16,28 @@
 ---   - Auto-closes when console closes (WinClosed)
 ---   - Submits input via :write command (BufWriteCmd)
 ---
---- @alias PromptInfo table Prompt information object with fields:
----   winid (number), bufnr (number), bufname (string), console_info (table)
 local M = {}
-local PREFIX = "aiboprompt://"
+local PREFIX = "aiboprompt"
+
+---@alias PromptInfo { winid: number, bufnr: number, bufname: string, console_info: ConsoleInfo? }
 
 ---@param bufname string
 ---@return number? console_winid or nil if not a valid prompt buffer
 local function parse_bufname(bufname)
-  local console_winid = string.match(bufname, "^" .. vim.pesc(PREFIX) .. "(%d+)$")
-  if console_winid then
-    return tonumber(console_winid)
-  else
+  local bufname_module = require("aibo.internal.bufname")
+  local scheme, components = bufname_module.decode(bufname)
+  if scheme ~= PREFIX then
     return nil
   end
+  -- components[1]: console_winid
+  if components[1] and components[1] ~= "" then
+    return tonumber(components[1])
+  end
+  return nil
 end
 
 ---@param partial { winid?: number, bufnr?: number, bufname?: string }
----@return nil or {
----  winid: number,
----  bufnr: number,
----  bufname: string,
----  console_info: nil or {
----    winid: number,
----    bufnr: number,
----    jobinfo: {
----      cmd: string,
----      args: string[],
----      job_id: number,
----    },
----  }
---- } Complete info or nil if invalid
+---@return PromptInfo? Complete info or nil if invalid
 local function build_info(partial)
   local console = require("aibo.internal.console_window")
 
@@ -68,7 +59,9 @@ local function build_info(partial)
   else
     error("[aibo] Either winid or bufnr must be provided")
   end
-  if string.sub(bufname, 1, #PREFIX) ~= PREFIX then
+  local bufname_module = require("aibo.internal.bufname")
+  local scheme, _ = bufname_module.decode(bufname)
+  if scheme ~= PREFIX then
     return nil
   end
   local console_info = nil
@@ -107,11 +100,9 @@ local function setup_mappings(bufnr)
   end
 
   define("<Plug>(aibo-send)", "Get one key from user and send it to associated console", function()
-    vim.api.nvim_echo({ { "Oneshot (press any key): ", "MoreMsg" } }, false, {})
-    local ok, char = pcall(vim.fn.getchar)
-    vim.api.nvim_echo({ { "", "Normal" } }, false, {})
-    if ok and char then
-      local key = type(char) == "number" and vim.fn.nr2char(char) or vim.fn.keytrans(char)
+    local keycode = require("aibo.internal.keycode")
+    local key = keycode.get_single_keycode({ prompt = "Oneshot (press any key): ", highlight = "MoreMsg" })
+    if key then
       send(key)
     end
   end)
@@ -140,9 +131,11 @@ local function WinLeave()
 end
 
 local function QuitPre()
+  local bufname_module = require("aibo.internal.bufname")
   local bufinfos = vim.fn.getbufinfo({ bufloaded = 1 })
   for _, bufinfo in ipairs(bufinfos) do
-    if string.sub(bufinfo.name, 1, #PREFIX) == PREFIX then
+    local scheme, _ = bufname_module.decode(bufinfo.name)
+    if scheme == PREFIX then
       vim.bo[bufinfo.bufnr].modified = false
     end
   end
@@ -153,14 +146,7 @@ end
 --- and associated console details.
 ---
 --- @param bufnr number The prompt buffer number to query
---- @return nil|table Returns nil if buffer is invalid, otherwise returns:
----   - winid: number - Window ID displaying the prompt (-1 if not displayed)
----   - bufnr: number - The prompt buffer number
----   - bufname: string - Full buffer name (aiboprompt://console_winid)
----   - console_info: table|nil - Associated console information if valid:
----     - winid: number - Console window ID
----     - bufnr: number - Console buffer number
----     - jobinfo: table - Terminal job details
+--- @return PromptInfo?
 ---
 --- @usage
 ---   local prompt = require("aibo.internal.prompt_window")
@@ -176,14 +162,7 @@ end
 --- Retrieves complete information about a prompt displayed in a specific window.
 ---
 --- @param winid number The window ID to query
---- @return nil|table Returns nil if window is invalid, otherwise returns:
----   - winid: number - The prompt window ID
----   - bufnr: number - Prompt buffer number in the window
----   - bufname: string - Full buffer name (aiboprompt://console_winid)
----   - console_info: table|nil - Associated console information if valid:
----     - winid: number - Console window ID
----     - bufnr: number - Console buffer number
----     - jobinfo: table - Terminal job details
+--- @return PromptInfo?
 ---
 --- @usage
 ---   local prompt = require("aibo.internal.prompt_window")
@@ -199,14 +178,7 @@ end
 --- Searches for a prompt buffer that is linked to a specific console window.
 ---
 --- @param console_winid number The console window ID to search for
---- @return nil|table Returns nil if no prompt found, otherwise returns:
----   - winid: number - Prompt window ID (-1 if not displayed)
----   - bufnr: number - Prompt buffer number
----   - bufname: string - Full buffer name (aiboprompt://console_winid)
----   - console_info: table|nil - Associated console information if valid:
----     - winid: number - Console window ID
----     - bufnr: number - Console buffer number
----     - jobinfo: table - Terminal job details
+--- @return PromptInfo?
 ---
 --- @usage
 ---   local prompt = require("aibo.internal.prompt_window")
@@ -218,7 +190,8 @@ end
 ---     end
 ---   end
 function M.get_info_by_console_winid(console_winid)
-  local bufname = string.format("%s%s", PREFIX, console_winid)
+  local bufname_module = require("aibo.internal.bufname")
+  local bufname = bufname_module.encode(PREFIX, { tostring(console_winid) })
   local bufnr = vim.fn.bufnr(bufname)
   if bufnr == -1 then
     return nil
@@ -227,6 +200,7 @@ function M.get_info_by_console_winid(console_winid)
 end
 
 --- Find prompt window information in the current tabpage
+---@return PromptInfo?
 function M.find_info_in_tabpage()
   local console = require("aibo.internal.console_window")
   -- We need to find the console window first while prompt windows are hidden
@@ -248,14 +222,7 @@ end
 ---   - opener?: string - Window command (default: "rightbelow 10split")
 ---                       Examples: "split", "vsplit", "leftabove split"
 ---   - startinsert?: boolean - Enter insert mode after opening (default: true)
---- @return nil|table Returns nil on failure, otherwise returns:
----   - winid: number - Prompt window ID
----   - bufnr: number - Prompt buffer number
----   - bufname: string - Full buffer name (aiboprompt://console_winid)
----   - console_info: table - Associated console information:
----     - winid: number - Console window ID
----     - bufnr: number - Console buffer number
----     - jobinfo: table - Terminal job details
+--- @return PromptInfo?
 ---
 --- @usage
 ---   local prompt = require("aibo.internal.prompt_window")
@@ -288,7 +255,8 @@ function M.open(console_winid, options)
   local opener = options.opener or string.format("rightbelow %dsplit", config.prompt_height)
 
   -- Check if the prompt window for the console already exists
-  local bufname = string.format("%s%s", PREFIX, console_winid)
+  local bufname_module = require("aibo.internal.bufname")
+  local bufname = bufname_module.encode(PREFIX, { tostring(console_winid) })
   local bufnr = vim.fn.bufnr(bufname)
   local winid = vim.fn.bufwinid(bufnr)
   if winid == -1 then
@@ -414,19 +382,19 @@ end
 local augroup = vim.api.nvim_create_augroup("aibo_prompt_internal", { clear = true })
 vim.api.nvim_create_autocmd("BufWritePre", {
   group = augroup,
-  pattern = string.format("%s*", PREFIX),
+  pattern = string.format("%s://*", PREFIX),
   nested = false,
   callback = BufWritePre,
 })
 vim.api.nvim_create_autocmd("BufWriteCmd", {
   group = augroup,
-  pattern = string.format("%s*", PREFIX),
+  pattern = string.format("%s://*", PREFIX),
   nested = true,
   callback = BufWriteCmd,
 })
 vim.api.nvim_create_autocmd("WinLeave", {
   group = augroup,
-  pattern = string.format("%s*", PREFIX),
+  pattern = string.format("%s://*", PREFIX),
   nested = true,
   callback = WinLeave,
 })

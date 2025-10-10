@@ -1,22 +1,42 @@
 local M = {}
-local PREFIX = "aiboconsole://"
+local PREFIX = "aiboconsole"
+
+---@alias JobInfo { cmd: string, args: string[], job_id: number }
+---@alias ConsoleInfo { winid: number, bufnr: number, bufname: string, jobinfo: JobInfo }
 
 ---@param bufname string Buffer name to parse
----@return nil or { cmd: string, args: string[], job_id: number? }
+---@return JobInfo?
 local function parse_bufname(bufname)
-  if string.sub(bufname, 1, #PREFIX) ~= PREFIX then
+  local bufname_module = require("aibo.internal.bufname")
+  local scheme, components = bufname_module.decode(bufname)
+  if scheme ~= PREFIX then
     return nil
   end
-  local parts = vim.split(bufname:sub(#PREFIX + 1), "/")
-  local cmd = parts[1]
+  -- Note: bufname.decode skips empty components, so:
+  -- "aiboconsole://cmd//job_id" → ["cmd", "job_id"]
+  -- "aiboconsole://cmd/args/job_id" → ["cmd", "args", "job_id"]
+  local cmd = components[1] or ""
   local args = {}
   local job_id = nil
-  if #parts >= 2 and parts[2] ~= "" then
-    args = vim.split(parts[2], "+")
+
+  if #components == 2 then
+    -- No args, only cmd and job_id
+    job_id = tonumber(components[2])
+  elseif #components >= 3 then
+    -- Has args: cmd, args, job_id
+    if components[2] and components[2] ~= "" then
+      -- Split by space (which was originally + before decode_component converted it)
+      local parts = vim.split(components[2], " ")
+      -- Filter out empty strings
+      for _, part in ipairs(parts) do
+        if part ~= "" then
+          table.insert(args, part)
+        end
+      end
+    end
+    job_id = tonumber(components[3])
   end
-  if #parts >= 3 and parts[3] ~= "" then
-    job_id = tonumber(parts[3])
-  end
+
   return {
     cmd = cmd,
     args = args,
@@ -25,12 +45,7 @@ local function parse_bufname(bufname)
 end
 
 ---@param partial { winid?: number, bufnr?: number, bufname?: string }
----@return nil or {
----   winid: number,
----   bufnr: number,
----   bufname: string,
----   jobinfo: { cmd: string, args: string[], job_id: number? }
---- } Complete info or nil if invalid
+---@return ConsoleInfo? Complete info or nil if invalid
 local function build_info(partial)
   local winid = partial.winid
   local bufnr = partial.bufnr
@@ -50,7 +65,9 @@ local function build_info(partial)
   else
     error("[aibo] Either winid or bufnr must be provided")
   end
-  if string.sub(bufname, 1, #PREFIX) ~= PREFIX then
+  local bufname_module = require("aibo.internal.bufname")
+  local scheme, _ = bufname_module.decode(bufname)
+  if scheme ~= PREFIX then
     return nil
   end
   local jobinfo = parse_bufname(bufname)
@@ -93,11 +110,9 @@ local function setup_mappings(bufnr)
   end
 
   define("<Plug>(aibo-send)", "Get one key from user and send it to the tool", function()
-    vim.api.nvim_echo({ { "Oneshot (press any key): ", "MoreMsg" } }, false, {})
-    local ok, char = pcall(vim.fn.getchar)
-    vim.api.nvim_echo({ { "", "Normal" } }, false, {})
-    if ok and char then
-      local key = type(char) == "number" and vim.fn.nr2char(char) or vim.fn.keytrans(char)
+    local keycode = require("aibo.internal.keycode")
+    local key = keycode.get_single_keycode({ prompt = "Oneshot (press any key): ", highlight = "MoreMsg" })
+    if key then
       send(key)
     end
   end)
@@ -120,11 +135,15 @@ local function BufWinEnter()
 end
 
 local function TermEnter()
+  local aibo = require("aibo")
   local prompt = require("aibo.internal.prompt_window")
   -- We need to use nvim_get_current_win() because bufwinid() may return wrong winid
   -- if multiple windows show the same buffer (e.g. :split)
   local winid = vim.api.nvim_get_current_win()
-  prompt.open(winid, { startinsert = true })
+  local config = aibo.get_config()
+  prompt.open(winid, {
+    startinsert = not config.disable_startinsert_on_insert,
+  })
 end
 
 ---@param ev { buf: number, file: string } Event data
@@ -154,14 +173,7 @@ end
 --- job details, and associated command.
 ---
 --- @param bufnr number The buffer number to query
---- @return nil|table Returns nil if buffer is invalid, otherwise returns:
----   - winid: number - Window ID displaying the buffer (-1 if not displayed)
----   - bufnr: number - The buffer number
----   - bufname: string - Full buffer name (aiboconsole://cmd/args/job_id)
----   - jobinfo: table|nil - Job information if buffer is a valid console:
----     - cmd: string - The command being executed
----     - args: string[] - Command arguments
----     - job_id: number|nil - Terminal job ID
+--- @return ConsoleInfo?
 ---
 --- @usage
 ---   local console = require("aibo.internal.console_window")
@@ -177,14 +189,7 @@ end
 --- Retrieves complete information about a console displayed in a specific window.
 ---
 --- @param winid number The window ID to query
---- @return nil|table Returns nil if window is invalid, otherwise returns:
----   - winid: number - The window ID
----   - bufnr: number - Buffer number in the window
----   - bufname: string - Full buffer name (aiboconsole://cmd/args/job_id)
----   - jobinfo: table|nil - Job information if buffer is a valid console:
----     - cmd: string - The command being executed
----     - args: string[] - Command arguments
----     - job_id: number|nil - Terminal job ID
+--- @return ConsoleInfo?
 ---
 --- @usage
 ---   local console = require("aibo.internal.console_window")
@@ -196,19 +201,25 @@ function M.get_info_by_winid(winid)
   return build_info({ winid = winid })
 end
 
+---@param options? { cmd?: string, args?: string[] }
+---@return ConsoleInfo?
 function M.find_info_in_tabpage(options)
   options = options or {}
 
-  local cmd = options.cmd and vim.pesc(options.cmd) or ".*"
-  local args = options.args and vim.pesc(table.concat(options.args, "+")) or ".*"
+  local cmd = options.cmd
+  local args = options.args
 
-  args = args or {}
-  local pattern = string.format("%s%s/%s/", vim.pesc(PREFIX), cmd, args)
   local founds = {}
   for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
     local info = M.get_info_by_winid(winid)
-    if info and info.bufname:match("^" .. pattern) then
-      table.insert(founds, info)
+    if info and info.jobinfo then
+      -- cmd matches if not specified or equals
+      local cmd_matches = not cmd or info.jobinfo.cmd == cmd
+      -- args matches if not specified or equals
+      local args_matches = not args or vim.deep_equal(info.jobinfo.args, args)
+      if cmd_matches and args_matches then
+        table.insert(founds, info)
+      end
     end
   end
 
@@ -219,19 +230,16 @@ function M.find_info_in_tabpage(options)
     return founds[1]
   end
 
-  local item = nil
-  vim.ui.select(founds, {
-    prompt = "Multiple Aibo console windows found. Select one:",
-    format_item = function(v)
-      return string.format("%s (bufnr: %d, winid: %d)", v.bufname, v.bufnr, v.winid)
-    end,
-  }, function(choice)
-    if not choice then
-      return
-    end
-    item = choice
-  end)
-  return item
+  -- Use synchronous inputlist since vim.ui.select is asynchronous
+  local choices = { "Multiple Aibo console windows found. Select one:" }
+  for i, v in ipairs(founds) do
+    choices[#choices + 1] = string.format("%d. %s (bufnr: %d, winid: %d)", i, v.bufname, v.bufnr, v.winid)
+  end
+  local idx = vim.fn.inputlist(choices)
+  if idx >= 1 and idx <= #founds then
+    return founds[idx]
+  end
+  return nil
 end
 
 --- Open a new console window and start an agent process.
@@ -243,14 +251,7 @@ end
 --- @param options? table Optional configuration:
 ---   - opener?: string - Window command ("split", "vsplit", "tabnew", etc.)
 ---                       Default: "edit" (replaced with "enew" internally)
---- @return nil|table Returns nil on failure, otherwise returns:
----   - winid: number - Window ID of the console
----   - bufnr: number - Buffer number of the console
----   - bufname: string - Full buffer name (aiboconsole://cmd/args/job_id)
----   - jobinfo: table|nil - Job information if buffer is a valid console:
----     - cmd: string - The command being executed
----     - args: string[] - Command arguments
----     - job_id: number|nil - Terminal job ID
+--- @return ConsoleInfo?
 ---
 --- @usage
 ---   local console = require("aibo.internal.console_window")
@@ -294,7 +295,10 @@ function M.open(cmd, args, options)
   end
   vim.cmd("stopinsert")
 
-  local bufname = string.format("%s%s/%s/%d", PREFIX, cmd, table.concat(args, "+"), job_id)
+  local bufname_module = require("aibo.internal.bufname")
+  -- Join args with space, which will be encoded as + by encode_component
+  local args_component = table.concat(args, " ")
+  local bufname = bufname_module.encode(PREFIX, { cmd, args_component, tostring(job_id) })
   vim.api.nvim_buf_set_name(bufnr, bufname)
 
   setup_mappings(bufnr)
@@ -325,8 +329,12 @@ function M.open(cmd, args, options)
     tool_cfg.on_attach(bufnr, info)
   end
 
+  local config = aibo.get_config()
+
   -- Open an associated prompt window with insert mode
-  prompt.open(winid, { startinsert = true })
+  prompt.open(winid, {
+    startinsert = not config.disable_startinsert_on_startup,
+  })
 
   return {
     winid = winid,
@@ -351,14 +359,7 @@ end
 ---   - opener?: string - Window command for displaying hidden console
 ---   - on_update?: function(winid, bufnr) - Output callback (new console only)
 ---   - on_exit?: function(winid, bufnr) - Exit callback (new console only)
---- @return nil|table Returns nil on failure, otherwise returns console info:
----   - winid: number - Window ID of the console
----   - bufnr: number - Buffer number of the console
----   - bufname: string - Full buffer name
----   - jobinfo: table|nil - Job information if buffer is a valid console:
----     - cmd: string - The command being executed
----     - args: string[] - Command arguments
----     - job_id: number|nil - Terminal job ID
+--- @return ConsoleInfo?
 ---
 --- @usage
 ---   local console = require("aibo.internal.console_window")
@@ -376,11 +377,11 @@ function M.focus_or_open(cmd, args, options)
         winid = winid,
         bufnr = existing.bufnr,
         bufname = existing.bufname,
-        jobinfo = {
-          cmd = existing.cmd,
-          args = existing.args,
-          job_id = existing.job_id,
-        },
+        jobinfo = existing.jobinfo and {
+          cmd = existing.jobinfo.cmd,
+          args = existing.jobinfo.args,
+          job_id = existing.jobinfo.job_id,
+        } or nil,
       }
     else
       vim.api.nvim_set_current_win(existing.winid)
@@ -401,14 +402,7 @@ end
 ---   - opener?: string - Window command for showing hidden console
 ---   - on_update?: function(winid, bufnr) - Output callback (new console only)
 ---   - on_exit?: function(winid, bufnr) - Exit callback (new console only)
---- @return nil|table Returns nil on failure, otherwise returns console info:
----   - winid: number - Window ID (-1 if hidden after toggle)
----   - bufnr: number - Buffer number of the console
----   - bufname: string - Full buffer name
----   - jobinfo: table|nil - Job information if buffer is a valid console:
----     - cmd: string - The command being executed
----     - args: string[] - Command arguments
----     - job_id: number|nil - Terminal job ID
+--- @return ConsoleInfo?
 ---
 --- @usage
 ---   local console = require("aibo.internal.console_window")
@@ -428,11 +422,11 @@ function M.toggle_or_open(cmd, args, options)
         winid = winid,
         bufnr = existing.bufnr,
         bufname = existing.bufname,
-        jobinfo = {
-          cmd = existing.cmd,
-          args = existing.args,
-          job_id = existing.job_id,
-        },
+        jobinfo = existing.jobinfo and {
+          cmd = existing.jobinfo.cmd,
+          args = existing.jobinfo.args,
+          job_id = existing.jobinfo.job_id,
+        } or nil,
       }
     else
       vim.api.nvim_win_close(existing.winid, false)
@@ -440,11 +434,11 @@ function M.toggle_or_open(cmd, args, options)
         winid = -1, -- -1 indicates "no window"
         bufnr = existing.bufnr,
         bufname = existing.bufname,
-        jobinfo = {
-          cmd = existing.cmd,
-          args = existing.args,
-          job_id = existing.job_id,
-        },
+        jobinfo = existing.jobinfo and {
+          cmd = existing.jobinfo.cmd,
+          args = existing.jobinfo.args,
+          job_id = existing.jobinfo.job_id,
+        } or nil,
       }
     end
   end
@@ -478,7 +472,10 @@ function M.follow(bufnr)
     vim.notify("Invalid buffer: " .. tostring(bufnr), vim.log.levels.ERROR, { title = "Aibo console Error" })
     return
   end
-  vim.api.nvim_win_set_cursor(info.winid, { vim.api.nvim_buf_line_count(bufnr), 0 })
+  -- Only move cursor if window is valid
+  if info.winid ~= -1 and vim.api.nvim_win_is_valid(info.winid) then
+    vim.api.nvim_win_set_cursor(info.winid, { vim.api.nvim_buf_line_count(bufnr), 0 })
+  end
 end
 
 --- Send raw input to a console's terminal job.
@@ -571,13 +568,13 @@ end
 local augroup = vim.api.nvim_create_augroup("aibo_console_internal", { clear = true })
 vim.api.nvim_create_autocmd("TermEnter", {
   group = augroup,
-  pattern = string.format("%s*", PREFIX),
+  pattern = string.format("%s://*", PREFIX),
   nested = true,
   callback = TermEnter,
 })
 vim.api.nvim_create_autocmd("BufWinEnter", {
   group = augroup,
-  pattern = string.format("%s*", PREFIX),
+  pattern = string.format("%s://*", PREFIX),
   nested = true,
   callback = BufWinEnter,
 })

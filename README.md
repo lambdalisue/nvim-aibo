@@ -239,6 +239,8 @@ require('aibo').setup({
   submit_key = '<CR>',        -- Key to send after submit (default: '<CR>')
   prompt_height = 10,         -- Prompt window height (default: 10)
   termcode_mode = 'hybrid',   -- Terminal escape sequence mode: 'hybrid', 'xterm', or 'csi-n' (default: 'hybrid')
+  disable_startinsert_on_startup = false, -- Disable auto insert in prompt window when first opened (default: false)
+  disable_startinsert_on_insert = false,  -- Disable auto insert in prompt when entering insert from console (default: false)
 })
 ```
 
