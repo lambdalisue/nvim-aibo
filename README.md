@@ -398,25 +398,27 @@ Plus all console buffer mappings (with `<Plug>(aibo-send)<Key>` pattern).
 
 All Claude-specific keys use the `<Plug>(aibo-send)` pattern to send keys directly to the Claude CLI:
 
-| Key                  | Action         |
-| -------------------- | -------------- |
-| `<Tab>`              | Toggle think   |
-| `<S-Tab>`\* / `<F2>` | Switch mode    |
-| `<C-o>`              | Toggle verbose |
-| `<C-t>`              | Show todo      |
-| `<C-_>` / `<C-->`    | Undo           |
-| `<C-v>`              | Paste          |
+| Key                  | Action                    |
+| -------------------- | ------------------------- |
+| `<Tab>`              | Toggle think              |
+| `<S-Tab>`\* / `<F2>` | Switch mode               |
+| `<C-o>`              | Toggle verbose            |
+| `<C-t>`              | Show todo                 |
+| `<C-_>` / `<C-->`    | Undo                      |
+| `<C-v>`              | Paste                     |
+| `<C-u>`              | Clear line (move to end, then clear to beginning) |
 
 ### Tool-Specific (Codex)
 
-| Key          | Action          |
-| ------------ | --------------- |
-| `<C-t>`      | Show transcript |
-| `<Home>`     | Home            |
-| `<End>`      | End             |
-| `<PageUp>`   | Page up         |
-| `<PageDown>` | Page down       |
-| `q`          | Quit            |
+| Key          | Action                                               |
+| ------------ | ---------------------------------------------------- |
+| `<C-t>`      | Show transcript                                      |
+| `<C-v>`      | Paste                                                |
+| `<C-u>`      | Clear line (move to end, then clear to beginning)    |
+| `<Home>`     | Home                                                 |
+| `<End>`      | End                                                  |
+| `<PageUp>`   | Page up                                              |
+| `<PageDown>` | Page down                                            |
 
 > [!IMPORTANT]
 > Some key combinations (`<C-Enter>`, `<S-Tab>`) require modern terminal emulators like Kitty, WezTerm, or Ghostty. Use alternatives like `<F5>` or `:w` if these don't work.
@@ -468,6 +470,7 @@ vim.keymap.set({ "n", "i" }, "<C-o>", "<Plug>(aibo-send)<C-o>", opts)
 vim.keymap.set({ "n", "i" }, "<C-t>", "<Plug>(aibo-send)<C-t>", opts)
 vim.keymap.set({ "n", "i" }, "<C-_>", "<Plug>(aibo-send)<C-_>", opts)
 vim.keymap.set({ "n", "i" }, "<C-v>", "<Plug>(aibo-send)<C-v>", opts)
+vim.keymap.set({ "n", "i" }, "<C-u>", "<Plug>(aibo-send)<End><Plug>(aibo-send)<C-u>", opts)
 ```
 
 #### Codex Tool
