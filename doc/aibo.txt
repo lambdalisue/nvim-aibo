@@ -617,14 +617,16 @@ Claude tool mappings:
 	<C-t>		Show todo (n/i)
 	<C-_>		Undo (n/i, also <C-->)
 	<C-v>		Paste (n/i)
+	<C-u>		Clear line - move to end, then clear to beginning (n/i)
 
 Codex tool mappings:
 	<C-t>		Show transcript (n/i)
+	<C-v>		Paste (n/i)
+	<C-u>		Clear line - move to end, then clear to beginning (n/i)
 	<Home>		Move to beginning (n/i)
 	<End>		Move to end (n/i)
 	<PageUp>	Page up (n/i)
 	<PageDown>	Page down (n/i)
-	q		Quit (n)
 
 Note: Some key combinations require modern terminal emulators. Use
 alternatives like <F5> if certain combinations don't work.
