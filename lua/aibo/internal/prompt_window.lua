@@ -300,6 +300,13 @@ function M.open(console_winid, options)
     end, 0)
   end
 
+  -- Auto-follow console output when prompt window opens
+  vim.defer_fn(function()
+    if console_info and vim.api.nvim_buf_is_valid(console_info.bufnr) then
+      console.follow(console_info.bufnr)
+    end
+  end, 0)
+
   return {
     winid = winid,
     bufnr = bufnr,
