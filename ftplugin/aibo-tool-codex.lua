@@ -10,9 +10,9 @@ local aibo = require("aibo")
 local cfg = aibo.get_tool_config("codex")
 if not (cfg and cfg.no_default_mappings) then
   local opts = { buffer = bufnr, nowait = true, silent = true }
-  vim.keymap.set({ "n", "i" }, "<C-t>", "<Plug>(aibo-send)<C-t>", opts)
-  vim.keymap.set({ "n", "i" }, "<C-v>", "<Plug>(aibo-send)<C-v>", opts)
-  vim.keymap.set({ "n", "i" }, "<C-u>", "<Plug>(aibo-send)<End><Plug>(aibo-send)<C-u>", opts)
+  vim.keymap.set({ "i" }, "<C-t>", "<Plug>(aibo-send)<C-t>", opts)
+  vim.keymap.set({ "i" }, "<C-v>", "<Plug>(aibo-send)<C-v>", opts)
+  vim.keymap.set({ "i" }, "<C-u>", "<Plug>(aibo-send)<End><Plug>(aibo-send)<C-u>", opts)
   vim.keymap.set({ "n", "i" }, "<Home>", "<Plug>(aibo-send)<Home>", opts)
   vim.keymap.set({ "n", "i" }, "<End>", "<Plug>(aibo-send)<End>", opts)
   vim.keymap.set({ "n", "i" }, "<PageUp>", "<Plug>(aibo-send)<PageUp>", opts)
