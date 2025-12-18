@@ -109,6 +109,31 @@ local function setup_mappings(bufnr)
   define("<Plug>(aibo-submit)", "Submit prompt to associated console", function()
     vim.cmd("write")
   end)
+
+  -- History navigation mappings
+  local history = require("aibo.internal.history")
+
+  local function set_buffer_and_cursor(lines)
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+    -- Move cursor to end of buffer
+    local last_line = #lines
+    local last_col = #lines[last_line]
+    vim.api.nvim_win_set_cursor(0, { last_line, last_col })
+  end
+
+  define("<Plug>(aibo-history-prev)", "Navigate to previous history entry", function()
+    local lines = history.prev(bufnr)
+    if lines then
+      set_buffer_and_cursor(lines)
+    end
+  end)
+
+  define("<Plug>(aibo-history-next)", "Navigate to next history entry", function()
+    local lines = history.next(bufnr)
+    if lines then
+      set_buffer_and_cursor(lines)
+    end
+  end)
 end
 
 ---@param ev { buf: number, file: string }
@@ -357,6 +382,7 @@ end
 ---@return nil Returns nil if buffer is invalid or submission fails
 function M.submit(bufnr)
   local console = require("aibo.internal.console_window")
+  local history = require("aibo.internal.history")
 
   local info = M.get_info_by_bufnr(bufnr)
   if not info or not info.console_info then
@@ -370,6 +396,11 @@ function M.submit(bufnr)
 
   local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
   local content = table.concat(lines, "\n")
+
+  -- Add to history before clearing
+  history.add(content)
+  history.clear_state(bufnr)
+
   vim.defer_fn(function()
     local b = info.console_info.bufnr
     if vim.api.nvim_buf_is_valid(b) then

@@ -29,4 +29,20 @@ if not (cfg and cfg.no_default_mappings) then
   vim.keymap.set("n", "<C-p>", "<Plug>(aibo-send)<C-p>", opts)
   vim.keymap.set("n", "<Down>", "<Plug>(aibo-send)<Down>", opts)
   vim.keymap.set("n", "<Up>", "<Plug>(aibo-send)<Up>", opts)
+
+  -- History navigation in insert mode (when completion menu is not visible)
+  -- Uses <Plug> mappings defined in prompt_window.lua
+  vim.keymap.set("i", "<C-p>", function()
+    if vim.fn.pumvisible() == 1 then
+      return "<C-p>"
+    end
+    return "<Plug>(aibo-history-prev)"
+  end, { buffer = bufnr, expr = true, remap = true, silent = true })
+
+  vim.keymap.set("i", "<C-n>", function()
+    if vim.fn.pumvisible() == 1 then
+      return "<C-n>"
+    end
+    return "<Plug>(aibo-history-next)"
+  end, { buffer = bufnr, expr = true, remap = true, silent = true })
 end
