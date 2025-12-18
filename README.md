@@ -385,12 +385,17 @@ Most keys use the `<Plug>(aibo-send)<Key>` pattern to send keys directly to the 
 
 ### Prompt Buffer
 
-| Key           | Action                    | Implementation                  |
-| ------------- | ------------------------- | ------------------------------- |
-| `<CR>`        | Submit content (n)        | `<Plug>(aibo-submit)`           |
-| `<C-Enter>`\* | Submit and close (n/i)    | `<Plug>(aibo-submit)<Cmd>q<CR>` |
-| `<F5>`        | Submit and close (n/i)    | `<Plug>(aibo-submit)<Cmd>q<CR>` |
-| `<C-g><C-o>`  | Send any single key (n/i) | `<Plug>(aibo-send)`             |
+| Key           | Action                          | Implementation                  |
+| ------------- | ------------------------------- | ------------------------------- |
+| `<CR>`        | Submit content (n)              | `<Plug>(aibo-submit)`           |
+| `<C-Enter>`\* | Submit and close (n/i)          | `<Plug>(aibo-submit)<Cmd>q<CR>` |
+| `<F5>`        | Submit and close (n/i)          | `<Plug>(aibo-submit)<Cmd>q<CR>` |
+| `<C-p>`       | Previous history or completion (i) | `<Plug>(aibo-history-prev)`  |
+| `<C-n>`       | Next history or completion (i)  | `<Plug>(aibo-history-next)`     |
+| `<C-g><C-o>`  | Send any single key (n/i)       | `<Plug>(aibo-send)`             |
+
+> [!NOTE]
+> `<C-p>` and `<C-n>` in insert mode intelligently switch between history navigation and completion menu navigation. When the completion popup menu is visible, they navigate the completion menu. When the popup is not visible, they navigate through your prompt history.
 
 Plus all console buffer mappings (with `<Plug>(aibo-send)<Key>` pattern).
 
@@ -440,10 +445,12 @@ vim.keymap.set('n', '<C-k>', '<Plug>(aibo-submit)<Cmd>q<CR>', opts)
 
 #### Core Mappings (Console and Prompt Buffers)
 
-| <Plug> Mapping        | Description                                     |
-| --------------------- | ----------------------------------------------- |
-| `<Plug>(aibo-send)`   | Prefix for sending keys to terminal (see below) |
-| `<Plug>(aibo-submit)` | Submit content to terminal                      |
+| <Plug> Mapping              | Description                                     |
+| --------------------------- | ----------------------------------------------- |
+| `<Plug>(aibo-send)`         | Prefix for sending keys to terminal (see below) |
+| `<Plug>(aibo-submit)`       | Submit content to terminal                      |
+| `<Plug>(aibo-history-prev)` | Navigate to previous prompt history entry       |
+| `<Plug>(aibo-history-next)` | Navigate to next prompt history entry           |
 
 The `<Plug>(aibo-send)` mapping is designed to be used as a prefix followed by a key:
 
