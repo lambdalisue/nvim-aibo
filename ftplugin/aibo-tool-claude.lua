@@ -39,6 +39,8 @@ if not (cfg and cfg.no_default_mappings) then
   vim.keymap.set({ "n" }, "<C-t>", "<Plug>(aibo-send)<C-t>", opts)
   vim.keymap.set({ "n" }, "<C-_>", "<Plug>(aibo-send)<C-_>", opts)
   vim.keymap.set({ "n" }, "<C-->", "<Plug>(aibo-send)<C-_>", opts)
+  vim.keymap.set({ "n" }, "<Left>", "<Plug>(aibo-send)<Left>", opts)
+  vim.keymap.set({ "n" }, "<Right>", "<Plug>(aibo-send)<Right>", opts)
   vim.keymap.set({ "i" }, "<C-v>", "<Plug>(aibo-send)<C-v>", opts)
   vim.keymap.set({ "i" }, "<C-u>", "<Plug>(aibo-send)<End><Plug>(aibo-send)<C-u>", opts)
 end
