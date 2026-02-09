@@ -12,6 +12,7 @@ local M = {}
 ---@field submit_delay? integer Delay before submit in ms (default: 100)
 ---@field prompt_height? integer Height of prompt window (default: 10)
 ---@field prompt_blend? integer Prompt window transparency 0-100, 0=opaque 100=transparent (default: 20)
+---@field prompt_title? string Prompt window title (default: " Cmd+Enter: Submit | Esc: Close | Ctrl+C: Cancel ")
 ---@field termcode_mode? string Terminal escape sequence mode: "hybrid", "xterm", or "csi-n" (default: "hybrid")
 ---@field disable_startinsert_on_startup? boolean Disable auto insert mode in prompt window when first opened (default: false)
 ---@field disable_startinsert_on_insert? boolean Disable auto insert mode in prompt window when entering insert mode from console (default: false)
@@ -32,6 +33,7 @@ local DEFAULTS = {
   submit_delay = 100,
   prompt_height = 10,
   prompt_blend = 20,
+  prompt_title = " Cmd+Enter: Submit | Esc: Close | Ctrl+C: Cancel ",
   termcode_mode = "hybrid",
   disable_startinsert_on_startup = false,
   disable_startinsert_on_insert = false,
