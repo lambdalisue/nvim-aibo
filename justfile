@@ -6,20 +6,20 @@ default:
 
 # Run luacheck and lua-language-server diagnostics
 lint:
-	@echo "Running luacheck..."
-	@luacheck lua/ --globals vim
+	echo "Running luacheck..."
+	luacheck lua/ --globals vim
 
 # Format code with stylua
 fmt:
-	@stylua lua/ tests/
+	stylua lua/ tests/
 
 # Run all tests
 test:
-	@nvim --headless --noplugin -u ./tests/minimal_init.lua -c "lua MiniTest.run()"
+	nvim --headless --noplugin -u ./tests/minimal_init.lua -c "lua MiniTest.run()"
 
 # Run a specific test file
 test-file FILE:
-	@nvim --headless --noplugin -u ./tests/minimal_init.lua -c "lua MiniTest.run_file('{{FILE}}')"
+	nvim --headless --noplugin -u ./tests/minimal_init.lua -c "lua MiniTest.run_file('{{FILE}}')"
 
 deps-mini-nvim:
   @mkdir -p .deps
