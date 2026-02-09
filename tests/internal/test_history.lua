@@ -49,6 +49,8 @@ T["prev returns previous history entry"] = function()
   history.add("third")
 
   -- Create a mock buffer
+  local original_set_lines = vim.api.nvim_buf_set_lines
+  local original_get_lines = vim.api.nvim_buf_get_lines
   vim.api.nvim_buf_set_lines = function()
     return {}
   end
@@ -68,6 +70,10 @@ T["prev returns previous history entry"] = function()
   -- At oldest entry
   result = history.prev(bufnr)
   eq(result, nil)
+
+  -- Restore
+  vim.api.nvim_buf_set_lines = original_set_lines
+  vim.api.nvim_buf_get_lines = original_get_lines
 end
 
 T["next returns next history entry"] = function()
@@ -77,6 +83,7 @@ T["next returns next history entry"] = function()
   history.add("first")
   history.add("second")
 
+  local original_get_lines = vim.api.nvim_buf_get_lines
   vim.api.nvim_buf_get_lines = function()
     return { "draft" }
   end
@@ -94,6 +101,9 @@ T["next returns next history entry"] = function()
 
   result = history.next(bufnr)
   eq(result, nil) -- Already at newest
+
+  -- Restore
+  vim.api.nvim_buf_get_lines = original_get_lines
 end
 
 T["clear_state resets navigation"] = function()
@@ -102,6 +112,7 @@ T["clear_state resets navigation"] = function()
 
   history.add("first")
 
+  local original_get_lines = vim.api.nvim_buf_get_lines
   vim.api.nvim_buf_get_lines = function()
     return { "" }
   end
@@ -111,6 +122,9 @@ T["clear_state resets navigation"] = function()
 
   history.clear_state(bufnr)
   eq(history.get_index(bufnr), nil)
+
+  -- Restore
+  vim.api.nvim_buf_get_lines = original_get_lines
 end
 
 T["prev preserves draft content"] = function()
@@ -120,6 +134,7 @@ T["prev preserves draft content"] = function()
   history.add("history entry")
 
   -- Mock buffer with draft content
+  local original_get_lines = vim.api.nvim_buf_get_lines
   vim.api.nvim_buf_get_lines = function()
     return { "my draft", "content" }
   end
@@ -131,6 +146,9 @@ T["prev preserves draft content"] = function()
   -- Navigate back to draft
   result = history.next(bufnr)
   eq(result, { "my draft", "content" })
+
+  -- Restore
+  vim.api.nvim_buf_get_lines = original_get_lines
 end
 
 T["handles multiline content"] = function()
@@ -139,12 +157,16 @@ T["handles multiline content"] = function()
 
   history.add("line1\nline2\nline3")
 
+  local original_get_lines = vim.api.nvim_buf_get_lines
   vim.api.nvim_buf_get_lines = function()
     return { "" }
   end
 
   local result = history.prev(bufnr)
   eq(result, { "line1", "line2", "line3" })
+
+  -- Restore
+  vim.api.nvim_buf_get_lines = original_get_lines
 end
 
 return T
