@@ -23,6 +23,27 @@ vim.api.nvim_create_autocmd("ColorScheme", {
   callback = setup_highlights,
 })
 
+-- Prevent prompt buffer from being opened in non-floating windows
+vim.api.nvim_create_autocmd("WinNew", {
+  group = vim.api.nvim_create_augroup("aibo_prompt_winnew", { clear = true }),
+  pattern = "aiboprompt://*",
+  callback = function()
+    vim.schedule(function()
+      local winid = vim.api.nvim_get_current_win()
+      if not vim.api.nvim_win_is_valid(winid) then
+        return
+      end
+
+      local win_config = vim.api.nvim_win_get_config(winid)
+      -- Close if not a floating window
+      if win_config.relative == "" then
+        vim.api.nvim_win_close(winid, true)
+        vim.notify("Prompt buffer cannot be split", vim.log.levels.WARN, { title = "Aibo prompt" })
+      end
+    end)
+  end,
+})
+
 -- Initialize command modules
 require("aibo.command.aibo").setup()
 require("aibo.command.aibo_send").setup()
