@@ -31,7 +31,7 @@ Aibo (from Japanese "companion") is designed as your AI companion in Neovim, pro
   - Programming REPLs (python, node, irb, ghci)
   - Database clients (psql, mysql, sqlite3)
   - Custom interactive tools
-- Split-window interface with console and prompt buffers
+- Floating window interface with console and transparent prompt overlay
 - Tool-specific configurations and key mappings
 - Intelligent command completion for supported AI tools
 
@@ -86,7 +86,7 @@ Where:
 - `<command>` - Any interactive CLI tool command
 - `[arguments...]` - Arguments passed directly to the CLI tool
 
-This opens a terminal console running the interactive CLI tool with a prompt buffer below.
+This opens a terminal console running the interactive CLI tool with a floating prompt window overlay.
 
 ### Examples
 

@@ -29,9 +29,9 @@ seamless integration with AI assistants through terminal interfaces. The name
 role as your AI companion in Neovim. While optimized for AI tools, it also
 works with any interactive CLI application.
 
-The plugin creates a split-window interface with:
+The plugin creates a floating window interface with:
 - A terminal console where AI tools or other CLI programs run
-- A dedicated prompt buffer for user input
+- A floating prompt window overlay for user input
 - Smart key mappings for efficient interaction
 
 Key features:
@@ -63,7 +63,7 @@ Start an interactive session with the |:Aibo| command:
 	:Aibo psql mydatabase
 <
 This opens a terminal console running the specified interactive tool and
-creates a prompt buffer below it for your input.
+creates a floating prompt window overlay for your input.
 
 Type your message in the prompt buffer and press |<CR>| in normal mode to
 submit. You can also use |<F5>| or |<C-Enter>| to submit from insert mode.
