@@ -187,6 +187,20 @@ CUSTOMIZATION					*aibo-customization*
 Default keymaps are defined in ftplugin files. You can customize them through
 ftplugin files or the on_attach callback.
 
+						*aibo-highlight-groups*
+Custom Highlight Groups~
+
+The plugin defines custom highlight groups for the prompt window that you
+can customize:
+>
+	" Customize prompt window colors
+	highlight AiboPromptNormal guibg=#1e1e2e guifg=#cdd6f4
+	highlight AiboPromptBorder guifg=#89b4fa
+<
+By default, these are linked to:
+- AiboPromptNormal → Normal (inherits your normal background/foreground)
+- AiboPromptBorder → FloatBorder (inherits your floating window border)
+
 						*aibo-ftplugin-customization*
 Using ftplugin files~
 
@@ -603,6 +617,7 @@ Console buffer mappings:
 
 Prompt buffer mappings:
 	<CR>		Submit content (n)
+	<Esc>		Close prompt window (n)
 	<C-Enter>	Submit and close (n/i)
 	<F5>		Submit and close (n/i)
 	<C-g><C-o>	Send any single key (n/i)

@@ -386,14 +386,15 @@ Most keys use the `<Plug>(aibo-send)<Key>` pattern to send keys directly to the 
 
 ### Prompt Buffer
 
-| Key           | Action                          | Implementation                  |
-| ------------- | ------------------------------- | ------------------------------- |
-| `<CR>`        | Submit content (n)              | `<Plug>(aibo-submit)`           |
-| `<C-Enter>`\* | Submit and close (n/i)          | `<Plug>(aibo-submit)<Cmd>q<CR>` |
-| `<F5>`        | Submit and close (n/i)          | `<Plug>(aibo-submit)<Cmd>q<CR>` |
-| `<C-p>`       | Previous history or completion (i) | `<Plug>(aibo-history-prev)`  |
-| `<C-n>`       | Next history or completion (i)  | `<Plug>(aibo-history-next)`     |
-| `<C-g><C-o>`  | Send any single key (n/i)       | `<Plug>(aibo-send)`             |
+| Key           | Action                             | Implementation                  |
+| ------------- | ---------------------------------- | ------------------------------- |
+| `<CR>`        | Submit content (n)                 | `<Plug>(aibo-submit)`           |
+| `<Esc>`       | Close prompt window (n)            | `<Cmd>q<CR>`                    |
+| `<C-Enter>`\* | Submit and close (n/i)             | `<Plug>(aibo-submit)<Cmd>q<CR>` |
+| `<F5>`        | Submit and close (n/i)             | `<Plug>(aibo-submit)<Cmd>q<CR>` |
+| `<C-p>`       | Previous history or completion (i) | `<Plug>(aibo-history-prev)`     |
+| `<C-n>`       | Next history or completion (i)     | `<Plug>(aibo-history-next)`     |
+| `<C-g><C-o>`  | Send any single key (n/i)          | `<Plug>(aibo-send)`             |
 
 > [!NOTE]
 > `<C-p>` and `<C-n>` in insert mode intelligently switch between history navigation and completion menu navigation. When the completion popup menu is visible, they navigate the completion menu. When the popup is not visible, they navigate through your prompt history.
@@ -404,32 +405,47 @@ Plus all console buffer mappings (with `<Plug>(aibo-send)<Key>` pattern).
 
 All Claude-specific keys use the `<Plug>(aibo-send)` pattern to send keys directly to the Claude CLI:
 
-| Key                  | Action                    |
-| -------------------- | ------------------------- |
-| `<Tab>`              | Toggle think              |
-| `<S-Tab>`\* / `<F2>` | Switch mode               |
-| `<C-o>`              | Toggle verbose            |
-| `<C-t>`              | Show todo                 |
-| `<C-_>` / `<C-->`    | Undo                      |
-| `<C-v>`              | Paste                     |
+| Key                  | Action                                            |
+| -------------------- | ------------------------------------------------- |
+| `<Tab>`              | Toggle think                                      |
+| `<S-Tab>`\* / `<F2>` | Switch mode                                       |
+| `<C-o>`              | Toggle verbose                                    |
+| `<C-t>`              | Show todo                                         |
+| `<C-_>` / `<C-->`    | Undo                                              |
+| `<C-v>`              | Paste                                             |
 | `<C-u>`              | Clear line (move to end, then clear to beginning) |
 
 ### Tool-Specific (Codex)
 
-| Key          | Action                                               |
-| ------------ | ---------------------------------------------------- |
-| `<C-t>`      | Show transcript                                      |
-| `<C-v>`      | Paste                                                |
-| `<C-u>`      | Clear line (move to end, then clear to beginning)    |
-| `<Home>`     | Home                                                 |
-| `<End>`      | End                                                  |
-| `<PageUp>`   | Page up                                              |
-| `<PageDown>` | Page down                                            |
+| Key          | Action                                            |
+| ------------ | ------------------------------------------------- |
+| `<C-t>`      | Show transcript                                   |
+| `<C-v>`      | Paste                                             |
+| `<C-u>`      | Clear line (move to end, then clear to beginning) |
+| `<Home>`     | Home                                              |
+| `<End>`      | End                                               |
+| `<PageUp>`   | Page up                                           |
+| `<PageDown>` | Page down                                         |
 
 > [!IMPORTANT]
 > Some key combinations (`<C-Enter>`, `<S-Tab>`) require modern terminal emulators like Kitty, WezTerm, or Ghostty. Use alternatives like `<F5>` or `:w` if these don't work.
 
 ## Customization
+
+### Custom Highlight Groups
+
+The plugin defines custom highlight groups for the prompt window that you can customize:
+
+```vim
+" Customize prompt window colors
+highlight AiboPromptNormal guibg=#1e1e2e guifg=#cdd6f4
+highlight AiboPromptBorder guifg=#89b4fa
+```
+
+By default, these are linked to:
+
+- `AiboPromptNormal` → `Normal` (inherits your normal background/foreground)
+- `AiboPromptBorder` → `FloatBorder` (inherits your floating window border)
 
 ### Using <Plug> Mappings
 
