@@ -238,6 +238,7 @@ require('aibo').setup({
   submit_delay = 100,         -- Delay in milliseconds (default: 100)
   submit_key = '<CR>',        -- Key to send after submit (default: '<CR>')
   prompt_height = 10,         -- Prompt window height (default: 10)
+  prompt_blend = 20,          -- Prompt window transparency 0-100, 0=opaque 100=transparent (default: 20)
   termcode_mode = 'hybrid',   -- Terminal escape sequence mode: 'hybrid', 'xterm', or 'csi-n' (default: 'hybrid')
   disable_startinsert_on_startup = false, -- Disable auto insert in prompt window when first opened (default: false)
   disable_startinsert_on_insert = false,  -- Disable auto insert in prompt when entering insert from console (default: false)
