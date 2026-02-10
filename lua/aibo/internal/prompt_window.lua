@@ -315,7 +315,7 @@ function M.open(console_winid, options)
       height = prompt_height,
       style = "minimal",
       border = "rounded",
-      title = config.prompt_title or " Cmd+Enter: Submit | Esc: Close | Ctrl+C: Cancel ",
+      title = config.prompt_title or " Ctrl+Enter: Submit | Esc: Close | Ctrl+C: Cancel ",
       title_pos = "right",
       focusable = true,
       zindex = 1,
