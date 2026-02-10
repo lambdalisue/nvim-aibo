@@ -28,8 +28,9 @@ vim.api.nvim_create_autocmd("WinNew", {
   group = vim.api.nvim_create_augroup("aibo_prompt_winnew", { clear = true }),
   pattern = "aiboprompt://*",
   callback = function()
+    -- Capture winid synchronously before scheduling
+    local winid = vim.api.nvim_get_current_win()
     vim.schedule(function()
-      local winid = vim.api.nvim_get_current_win()
       if not vim.api.nvim_win_is_valid(winid) then
         return
       end
