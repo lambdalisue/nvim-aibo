@@ -152,7 +152,13 @@ end
 
 local function WinLeave()
   local winid = vim.api.nvim_get_current_win()
-  vim.api.nvim_win_hide(winid)
+  if vim.api.nvim_win_is_valid(winid) then
+    local win_config = vim.api.nvim_win_get_config(winid)
+    -- Only auto-close floating windows to avoid conflicts with explicit :q/<Esc>
+    if win_config.relative and win_config.relative ~= "" then
+      pcall(vim.api.nvim_win_close, winid, false)
+    end
+  end
 end
 
 local function QuitPre()
@@ -239,21 +245,18 @@ end
 
 --- Open or reopen a prompt window for a console.
 --- Creates a new prompt buffer or reuses an existing one. The prompt window
---- is opened relative to its associated console window. Writing the buffer
---- (`:w`) submits its contents to the console.
+--- is opened as a floating window at the bottom of the console window.
+--- Writing the buffer (`:w`) submits its contents to the console.
 ---
 --- @param console_winid number The console window ID to attach to
 --- @param options? table Optional configuration:
----   - opener?: string - Window command (default: "rightbelow 10split")
----                       Examples: "split", "vsplit", "leftabove split"
 ---   - startinsert?: boolean - Enter insert mode after opening (default: true)
 --- @return PromptInfo?
 ---
 --- @usage
 ---   local prompt = require("aibo.internal.prompt_window")
----   -- Open prompt below console
+---   -- Open prompt as floating window
 ---   local prompt_info = prompt.open(console_winid, {
----     opener = "below 5split",
 ---     startinsert = true
 ---   })
 ---
@@ -277,20 +280,59 @@ function M.open(console_winid, options)
 
   options = options or {}
   local config = aibo.get_config()
-  local opener = options.opener or string.format("rightbelow %dsplit", config.prompt_height)
 
   -- Check if the prompt window for the console already exists
   local bufname_module = require("aibo.internal.bufname")
   local bufname = bufname_module.encode(PREFIX, { tostring(console_winid) })
   local bufnr = vim.fn.bufnr(bufname)
+
+  -- Create buffer if it doesn't exist
+  if bufnr == -1 then
+    bufnr = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_buf_set_name(bufnr, bufname)
+  end
+
+  -- Check if window already exists
   local winid = vim.fn.bufwinid(bufnr)
   if winid == -1 then
-    -- The prompt buffer is not displayed in any window in the current tabpage, open it
-    vim.api.nvim_win_call(console_winid, function()
-      vim.cmd(string.format("silent %s %s", opener, vim.fn.fnameescape(bufname)))
-      winid = vim.api.nvim_get_current_win()
-      bufnr = vim.api.nvim_get_current_buf()
-    end)
+    -- Get console window dimensions
+    local console_height = vim.api.nvim_win_get_height(console_winid)
+    local console_width = vim.api.nvim_win_get_width(console_winid)
+
+    -- Calculate floating window position and size
+    local prompt_height = config.prompt_height or 10
+    -- Clamp prompt_height to fit within console (account for border which takes 2 rows)
+    prompt_height = math.min(prompt_height, math.max(1, console_height - 2))
+    local row = console_height - prompt_height - 2 -- Position at bottom with border space
+    -- Ensure row is never negative
+    row = math.max(0, row)
+    local col = 0
+
+    -- Create floating window configuration
+    local float_config = {
+      relative = "win",
+      win = console_winid,
+      row = row,
+      col = col,
+      width = math.max(1, console_width - 2), -- Account for rounded border
+      height = prompt_height,
+      style = "minimal",
+      border = "rounded",
+      title = config.prompt_title or " Ctrl+Enter: Submit | Esc: Close | Ctrl+C: Cancel ",
+      title_pos = "right",
+      focusable = true,
+      zindex = 1,
+    }
+
+    -- Create floating window
+    winid = vim.api.nvim_open_win(bufnr, true, float_config)
+
+    -- Set window highlight to use custom Aibo prompt highlights
+    vim.wo[winid].winhighlight = "NormalFloat:AiboPromptNormal,FloatBorder:AiboPromptBorder"
+    -- Set window transparency
+    vim.wo[winid].winblend = config.prompt_blend or 20
+  else
+    -- Window already exists, just focus it
     vim.api.nvim_set_current_win(winid)
   end
 
@@ -320,17 +362,10 @@ function M.open(console_winid, options)
   if options.startinsert then
     vim.defer_fn(function()
       if vim.api.nvim_win_is_valid(winid) and vim.api.nvim_get_current_win() == winid then
-        vim.cmd("startinsert")
+        vim.cmd("startinsert!")
       end
     end, 0)
   end
-
-  -- Auto-follow console output when prompt window opens
-  vim.defer_fn(function()
-    if console_info and vim.api.nvim_buf_is_valid(console_info.bufnr) then
-      console.follow(console_info.bufnr)
-    end
-  end, 0)
 
   return {
     winid = winid,

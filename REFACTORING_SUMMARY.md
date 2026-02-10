@@ -5,6 +5,7 @@ This document summarizes the changes made during the refactoring from the main b
 ## Major Changes
 
 ### 1. Terminology Update: Agent → Tool
+
 - **Rationale**: Better reflects that the plugin works with any CLI tool, not just AI agents
 - **Impact**: All references to "agent" in code and documentation changed to "tool"
 - **Files affected**:
@@ -13,6 +14,7 @@ This document summarizes the changes made during the refactoring from the main b
   - Updated all documentation
 
 ### 2. Module Reorganization
+
 - **Console management**:
   - Split `console.lua` into `console_window.lua` and `prompt_window.lua`
   - Better separation of concerns between console and prompt functionality
@@ -24,6 +26,7 @@ This document summarizes the changes made during the refactoring from the main b
   - `integration/init.lua` - Centralized integration management
 
 ### 3. Test Suite Improvements
+
 - **Reorganization**:
   - Moved tests from `tests/unit/` to `tests/internal/`
   - Renamed `test_runner.lua` to `runner.lua`
@@ -37,11 +40,13 @@ This document summarizes the changes made during the refactoring from the main b
 ### 4. Specific Test Enhancements
 
 #### test_console_window.lua
+
 - Added tests for all 9 public functions
 - Added edge case tests for window management
 - Added tests for error conditions
 
 #### test_aibo_command.lua
+
 - Added tests for opener option completion
 - Added tests for stay option behavior
 - Added tests for mutually exclusive options
@@ -49,6 +54,7 @@ This document summarizes the changes made during the refactoring from the main b
 - Added tests for all option combinations
 
 #### test_aibo_send_command.lua
+
 - Added tests for -submit option alone
 - Added tests for M.setup function
 - Added tests for empty buffer handling
@@ -58,7 +64,9 @@ This document summarizes the changes made during the refactoring from the main b
 ## API Changes
 
 ### Configuration Structure
+
 **Before:**
+
 ```lua
 require('aibo').setup({
   agents = {
@@ -68,6 +76,7 @@ require('aibo').setup({
 ```
 
 **After:**
+
 ```lua
 require('aibo').setup({
   tools = {
@@ -77,18 +86,21 @@ require('aibo').setup({
 ```
 
 ### Function Name Changes
+
 - `get_agent_config()` → `get_tool_config()`
 - Agent-related internal functions renamed to use "tool"
 
 ## Documentation Updates
 
 ### README.md
+
 - Updated all references from "agent" to "tool"
 - Updated configuration examples
 - Updated ftplugin file paths
 - Clarified that the plugin works with any interactive CLI tool
 
 ### CONTRIBUTING.md
+
 - Updated architecture section with new module structure
 - Updated references from "agent" to "tool"
 - Updated file paths to reflect reorganization
@@ -96,11 +108,13 @@ require('aibo').setup({
 ## Testing
 
 All tests pass successfully:
+
 - Total: 135 tests
 - Passed: 135
 - Failed: 0
 
 Test improvements include:
+
 - Better isolation using tabs
 - Mocking of vim.ui.select to prevent blocking
 - More robust timing tests using condition-based waiting
@@ -109,6 +123,7 @@ Test improvements include:
 ## Migration Notes
 
 For users upgrading from the previous version:
+
 1. Update configuration from `agents = {}` to `tools = {}`
 2. Update any custom ftplugin files from `aibo-agent-*` to `aibo-tool-*`
 3. Update any references to agent-specific functions to use "tool" terminology

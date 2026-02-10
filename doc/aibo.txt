@@ -29,9 +29,9 @@ seamless integration with AI assistants through terminal interfaces. The name
 role as your AI companion in Neovim. While optimized for AI tools, it also
 works with any interactive CLI application.
 
-The plugin creates a split-window interface with:
+The plugin creates a floating window interface with:
 - A terminal console where AI tools or other CLI programs run
-- A dedicated prompt buffer for user input
+- A floating prompt window overlay for user input
 - Smart key mappings for efficient interaction
 
 Key features:
@@ -63,7 +63,7 @@ Start an interactive session with the |:Aibo| command:
 	:Aibo psql mydatabase
 <
 This opens a terminal console running the specified interactive tool and
-creates a prompt buffer below it for your input.
+creates a floating prompt window overlay for your input.
 
 Type your message in the prompt buffer and press |<CR>| in normal mode to
 submit. You can also use |<F5>| or |<C-Enter>| to submit from insert mode.
@@ -125,6 +125,7 @@ The setup function can be called multiple times to update configuration:
 	  submit_delay = 100,    -- Delay before submit in ms (default: 100)
 	  submit_key = '<CR>',   -- Key to send after submit (default: '<CR>')
 	  prompt_height = 10,    -- Height of prompt window (default: 10)
+	  prompt_blend = 20,     -- Prompt window transparency 0-100, 0=opaque 100=transparent (default: 20)
 	  termcode_mode = 'hybrid', -- Terminal escape sequence mode (default: 'hybrid')
 	  disable_startinsert_on_startup = false, -- Disable auto insert in prompt window when first opened (default: false)
 	  disable_startinsert_on_insert = false,  -- Disable auto insert in prompt when entering insert from console (default: false)
@@ -185,6 +186,20 @@ CUSTOMIZATION					*aibo-customization*
 
 Default keymaps are defined in ftplugin files. You can customize them through
 ftplugin files or the on_attach callback.
+
+						*aibo-highlight-groups*
+Custom Highlight Groups~
+
+The plugin defines custom highlight groups for the prompt window that you
+can customize:
+>
+	" Customize prompt window colors
+	highlight AiboPromptNormal guibg=#1e1e2e guifg=#cdd6f4
+	highlight AiboPromptBorder guifg=#89b4fa
+<
+By default, these are linked to:
+- AiboPromptNormal → Normal (inherits your normal background/foreground)
+- AiboPromptBorder → FloatBorder (inherits your floating window border)
 
 						*aibo-ftplugin-customization*
 Using ftplugin files~
@@ -602,6 +617,7 @@ Console buffer mappings:
 
 Prompt buffer mappings:
 	<CR>		Submit content (n)
+	<Esc>		Close prompt window (n)
 	<C-Enter>	Submit and close (n/i)
 	<F5>		Submit and close (n/i)
 	<C-g><C-o>	Send any single key (n/i)

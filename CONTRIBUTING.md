@@ -82,14 +82,12 @@ ftplugin/
 ### Key Architectural Principles
 
 1. **Separation of Concerns**
-
    - Command modules handle user-facing commands
    - Integration modules own their `<Plug>` mappings
    - Internal modules provide shared utilities
    - Clear boundaries between console, prompt, and controller
 
 2. **Module Responsibilities**
-
    - `command/`: User command parsing and execution
    - `integration/`: Tool-specific features and behaviors
    - `internal/`: Core functionality and utilities
@@ -105,14 +103,12 @@ ftplugin/
 ### Lua Style Guide
 
 1. **Naming Conventions**
-
    - Use `snake_case` for variables and functions
    - Use `PascalCase` for classes/modules
    - Prefix private functions with underscore `_`
    - Use descriptive names
 
 2. **Documentation**
-
    - Use LuaLS annotations for all public functions
    - Document complex logic with inline comments
    - Keep comments concise and relevant
@@ -244,13 +240,11 @@ return test_set
 ### Test Guidelines
 
 1. **Test Organization**
-
    - One test file per module
    - Group related tests in the same file
    - Use descriptive test names
 
 2. **Test Coverage**
-
    - Test public API thoroughly
    - Include edge cases and error conditions
    - Test integration points
@@ -359,7 +353,6 @@ return M
    ```
 
 2. **Make changes**
-
    - Follow the code style guide
    - Add tests for new functionality
    - Update documentation as needed
@@ -417,13 +410,11 @@ Before submitting a PR, ensure:
    ```
 
 2. **Create PR on GitHub**
-
    - Use a descriptive title
    - Reference related issues
    - Provide context and examples
 
 3. **Address review feedback**
-
    - Respond to all comments
    - Push additional commits as needed
    - Request re-review when ready
@@ -505,4 +496,3 @@ just clean          # Clean temporary files
 - Provide minimal reproducible examples for bugs
 
 Thank you for contributing to Aibo!
-
