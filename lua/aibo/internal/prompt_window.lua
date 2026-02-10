@@ -298,7 +298,11 @@ function M.open(console_winid, options)
 
     -- Calculate floating window position and size
     local prompt_height = config.prompt_height or 10
+    -- Clamp prompt_height to fit within console (account for border which takes 2 rows)
+    prompt_height = math.min(prompt_height, math.max(1, console_height - 2))
     local row = console_height - prompt_height - 2 -- Position at bottom with border space
+    -- Ensure row is never negative
+    row = math.max(0, row)
     local col = 0
 
     -- Create floating window configuration
@@ -307,7 +311,7 @@ function M.open(console_winid, options)
       win = console_winid,
       row = row,
       col = col,
-      width = console_width,
+      width = math.max(1, console_width - 2), -- Account for rounded border
       height = prompt_height,
       style = "minimal",
       border = "rounded",
