@@ -153,8 +153,11 @@ end
 local function WinLeave()
   local winid = vim.api.nvim_get_current_win()
   if vim.api.nvim_win_is_valid(winid) then
-    -- Close floating window when leaving it
-    vim.api.nvim_win_close(winid, false)
+    local win_config = vim.api.nvim_win_get_config(winid)
+    -- Only auto-close floating windows to avoid conflicts with explicit :q/<Esc>
+    if win_config.relative and win_config.relative ~= "" then
+      pcall(vim.api.nvim_win_close, winid, false)
+    end
   end
 end
 
