@@ -440,6 +440,7 @@ function M.submit(bufnr)
     local b = info.console_info.bufnr
     if vim.api.nvim_buf_is_valid(b) then
       console.submit(b, content)
+      console.follow(b)
     end
   end, 0)
 

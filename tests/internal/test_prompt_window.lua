@@ -260,6 +260,7 @@ end
 -- Test submit function
 T["submit sends prompt content to console"] = function()
   local prompt = require("aibo.internal.prompt_window")
+  local console = require("aibo.internal.console_window")
 
   -- Create a console buffer with terminal
   local console_bufnr = vim.api.nvim_create_buf(false, true)
@@ -274,9 +275,22 @@ T["submit sends prompt content to console"] = function()
   vim.b[prompt_bufnr].aibo_console_bufnr = console_bufnr
   vim.api.nvim_buf_set_lines(prompt_bufnr, 0, -1, false, { "Test submission" })
 
+  local original_follow = console.follow
+  local followed = nil
+  console.follow = function(bufnr)
+    followed = bufnr
+  end
+
   -- Test that submit doesn't error
   local ok = pcall(prompt.submit, prompt_bufnr)
   eq(ok, true)
+
+  vim.wait(50, function()
+    return followed ~= nil
+  end)
+  eq(followed, console_bufnr)
+
+  console.follow = original_follow
 end
 
 return T
