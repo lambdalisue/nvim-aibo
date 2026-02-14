@@ -235,7 +235,7 @@ This is particularly useful for sending code snippets, error messages, or other 
 
 ```lua
 require('aibo').setup({
-  submit_delay = 100,         -- Delay in milliseconds (default: 100)
+  submit_delay = 500,         -- Delay in milliseconds (default: 500)
   submit_key = '<CR>',        -- Key to send after submit (default: '<CR>')
   prompt_height = 10,         -- Prompt window height (default: 10)
   prompt_blend_insert = 10,   -- Prompt transparency in Insert mode 0-100 (default: 10)

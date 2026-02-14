@@ -122,7 +122,7 @@ can call |aibo.setup()| in your configuration to customize the plugin.
 The setup function can be called multiple times to update configuration:
 >
 	require('aibo').setup({
-	  submit_delay = 100,    -- Delay before submit in ms (default: 100)
+	  submit_delay = 500,    -- Delay before submit in ms (default: 500)
 	  submit_key = '<CR>',   -- Key to send after submit (default: '<CR>')
 	  prompt_height = 10,    -- Height of prompt window (default: 10)
 	  prompt_blend_insert = 10, -- Prompt transparency in Insert mode (default: 10)
@@ -522,7 +522,7 @@ aibo.setup({config})
 	Each call merges the new options with the existing configuration.
 >
 		require('aibo').setup({
-		  submit_delay = 100,
+		  submit_delay = 500,
 		  prompt_height = 10,
 		})
 <

@@ -9,7 +9,7 @@ local M = {}
 ---@field console? AiboBufferConfig Configuration for console buffers
 ---@field tools? table<string, AiboBufferConfig> Tool-specific configurations
 ---@field submit_key? string Key to submit input (default: "<CR>")
----@field submit_delay? integer Delay before submit in ms (default: 100)
+---@field submit_delay? integer Delay before submit in ms (default: 500)
 ---@field prompt_height? integer Height of prompt window (default: 10)
 ---@field prompt_blend? integer (deprecated) Prompt window transparency, used as fallback for prompt_blend_insert/prompt_blend_normal
 ---@field prompt_blend_insert? integer Prompt window transparency in Insert mode 0-100 (default: 10)
@@ -32,7 +32,7 @@ local DEFAULTS = {
   -- Tool-specific configurations can be added here
   tools = {},
   submit_key = "<CR>",
-  submit_delay = 100,
+  submit_delay = 500,
   prompt_height = 10,
   prompt_blend_insert = 10,
   prompt_blend_normal = 30,

@@ -12,7 +12,7 @@ T["setup function"] = function()
   -- Test default setup
   aibo.setup()
   local config = aibo.get_config()
-  eq(config.submit_delay, 100)
+  eq(config.submit_delay, 500)
   eq(config.prompt_height, 10)
 
   -- Test custom setup
