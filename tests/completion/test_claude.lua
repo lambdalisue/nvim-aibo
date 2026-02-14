@@ -105,4 +105,47 @@ T["omnifunc adds leading slash if missing"] = function()
   eq(has_help, true)
 end
 
+-- Test that omnifunc routes @ prefix to file completion
+T["omnifunc routes @ prefix to file completion"] = function()
+  local completion = require("aibo.completion.claude")
+
+  local completions = completion.omnifunc(0, "@")
+  eq(type(completions), "table")
+
+  -- All completions should be files/dirs, not slash commands
+  for _, item in ipairs(completions) do
+    eq(item.kind == "File" or item.kind == "Dir", true)
+    eq(item.word:sub(1, 1), "@")
+  end
+end
+
+-- Test that omnifunc routes @/ prefix to file completion (not slash)
+T["omnifunc routes @/ to file completion over slash"] = function()
+  local completion = require("aibo.completion.claude")
+
+  -- "@/" contains "/" but should route to file completion, not slash commands
+  local completions = completion.omnifunc(0, "@/")
+  eq(type(completions), "table")
+
+  -- Should NOT contain slash commands
+  for _, item in ipairs(completions) do
+    eq(item.kind == "File" or item.kind == "Dir", true)
+  end
+end
+
+-- Test that slash commands still work when @ routing is present
+T["omnifunc still returns slash commands for / prefix"] = function()
+  local completion = require("aibo.completion.claude")
+
+  local completions = completion.omnifunc(0, "/")
+  eq(type(completions), "table")
+  eq(#completions > 0, true)
+
+  -- All completions should be slash commands
+  for _, item in ipairs(completions) do
+    eq(item.kind, "Slash")
+    eq(item.word:sub(1, 1), "/")
+  end
+end
+
 return T
