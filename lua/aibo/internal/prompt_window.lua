@@ -77,6 +77,86 @@ local function build_info(partial)
   }
 end
 
+local highlights_initialized = false
+
+local function setup_highlights()
+  vim.api.nvim_set_hl(0, "AiboPromptNormal", { default = true, link = "Normal" })
+  vim.api.nvim_set_hl(0, "AiboPromptBorder", { default = true, link = "DiagnosticInfo" })
+  vim.api.nvim_set_hl(0, "AiboPromptTitle", { default = true, link = "DiagnosticInfo" })
+  vim.api.nvim_set_hl(0, "AiboPromptInsertBorder", { default = true, link = "DiagnosticWarn" })
+  vim.api.nvim_set_hl(0, "AiboPromptInsertTitle", { default = true, link = "DiagnosticWarn" })
+end
+
+--- Ensure prompt highlight groups are defined (once per session).
+--- Deferred from plugin/ load time to avoid colorscheme timing issues.
+--- Also registers a ColorScheme autocmd for future colorscheme changes.
+local function ensure_highlights()
+  if highlights_initialized then
+    return
+  end
+  highlights_initialized = true
+  setup_highlights()
+  vim.api.nvim_create_autocmd("ColorScheme", {
+    group = vim.api.nvim_create_augroup("aibo_highlights", { clear = true }),
+    callback = setup_highlights,
+  })
+end
+
+--- Apply mode-specific highlights and winblend to prompt window.
+--- In Insert mode, uses AiboPromptInsertBorder/Title and lower winblend (more opaque).
+--- In Normal mode, uses AiboPromptBorder/Title and higher winblend (more transparent).
+---@param winid number Window ID
+---@param mode "insert"|"normal" Current mode
+local function apply_mode_style(winid, mode)
+  if not vim.api.nvim_win_is_valid(winid) then
+    return
+  end
+  local aibo = require("aibo")
+  local config = aibo.get_config()
+  if mode == "insert" then
+    vim.wo[winid].winhighlight =
+      "NormalFloat:AiboPromptNormal,FloatBorder:AiboPromptInsertBorder,FloatTitle:AiboPromptInsertTitle"
+    vim.wo[winid].winblend = config.prompt_blend_insert or 10
+  else
+    vim.wo[winid].winhighlight = "NormalFloat:AiboPromptNormal,FloatBorder:AiboPromptBorder,FloatTitle:AiboPromptTitle"
+    vim.wo[winid].winblend = config.prompt_blend_normal or 30
+  end
+end
+
+--- Set up autocmds for mode-dependent prompt window styling.
+--- Only creates autocmds once per buffer (tracked via buffer variable).
+---@param bufnr number Buffer number
+local function setup_mode_autocmds(bufnr)
+  if vim.b[bufnr].aibo_prompt_mode_autocmds then
+    return
+  end
+  vim.b[bufnr].aibo_prompt_mode_autocmds = true
+
+  local mode_augroup = vim.api.nvim_create_augroup("aibo_prompt_mode_" .. bufnr, { clear = true })
+
+  vim.api.nvim_create_autocmd("InsertEnter", {
+    group = mode_augroup,
+    buffer = bufnr,
+    callback = function()
+      local wid = vim.fn.bufwinid(bufnr)
+      if wid ~= -1 then
+        apply_mode_style(wid, "insert")
+      end
+    end,
+  })
+
+  vim.api.nvim_create_autocmd("InsertLeave", {
+    group = mode_augroup,
+    buffer = bufnr,
+    callback = function()
+      local wid = vim.fn.bufwinid(bufnr)
+      if wid ~= -1 then
+        apply_mode_style(wid, "normal")
+      end
+    end,
+  })
+end
+
 ---@param bufnr number Buffer number
 local function setup_mappings(bufnr)
   local aibo = require("aibo")
@@ -265,6 +345,7 @@ end
 ---     "Hello, AI assistant!"
 ---   })
 function M.open(console_winid, options)
+  ensure_highlights()
   local aibo = require("aibo")
   local console = require("aibo.internal.console_window")
 
@@ -321,21 +402,22 @@ function M.open(console_winid, options)
       title = config.prompt_title or " Ctrl+Enter: Submit | Esc: Close | Ctrl+C: Cancel ",
       title_pos = "right",
       focusable = true,
-      zindex = 1,
+      zindex = 49,
     }
 
     -- Create floating window
     winid = vim.api.nvim_open_win(bufnr, true, float_config)
-
-    -- Set window highlight to use custom Aibo prompt highlights
-    vim.wo[winid].winhighlight = "NormalFloat:AiboPromptNormal,FloatBorder:AiboPromptBorder"
-    -- Set window transparency
-    vim.wo[winid].winblend = config.prompt_blend or 20
   else
     -- Window already exists, just focus it
     vim.api.nvim_set_current_win(winid)
   end
 
+  -- Apply mode style based on initial mode:
+  -- if options.startinsert is true, we expect to enter insert mode immediately,
+  -- so apply insert styling up front to avoid a normal→insert flicker.
+  local initial_mode = (options and options.startinsert) and "insert" or "normal"
+  apply_mode_style(winid, initial_mode)
+  setup_mode_autocmds(bufnr)
   setup_mappings(bufnr)
   vim.bo[bufnr].buftype = "acwrite"
   vim.bo[bufnr].bufhidden = "hide"

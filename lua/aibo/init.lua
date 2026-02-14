@@ -11,7 +11,9 @@ local M = {}
 ---@field submit_key? string Key to submit input (default: "<CR>")
 ---@field submit_delay? integer Delay before submit in ms (default: 100)
 ---@field prompt_height? integer Height of prompt window (default: 10)
----@field prompt_blend? integer Prompt window transparency 0-100, 0=opaque 100=transparent (default: 20)
+---@field prompt_blend? integer (deprecated) Prompt window transparency, used as fallback for prompt_blend_insert/prompt_blend_normal
+---@field prompt_blend_insert? integer Prompt window transparency in Insert mode 0-100 (default: 10)
+---@field prompt_blend_normal? integer Prompt window transparency in Normal mode 0-100 (default: 30)
 ---@field prompt_title? string Prompt window title (default: " Ctrl+Enter: Submit | Esc: Close | Ctrl+C: Cancel ")
 ---@field termcode_mode? string Terminal escape sequence mode: "hybrid", "xterm", or "csi-n" (default: "hybrid")
 ---@field disable_startinsert_on_startup? boolean Disable auto insert mode in prompt window when first opened (default: false)
@@ -32,7 +34,8 @@ local DEFAULTS = {
   submit_key = "<CR>",
   submit_delay = 100,
   prompt_height = 10,
-  prompt_blend = 20,
+  prompt_blend_insert = 10,
+  prompt_blend_normal = 30,
   prompt_title = " Ctrl+Enter: Submit | Esc: Close | Ctrl+C: Cancel ",
   termcode_mode = "hybrid",
   disable_startinsert_on_startup = false,
@@ -68,6 +71,15 @@ function M.setup(opts)
     return
   end
   config = vim.tbl_deep_extend("force", config, opts or {})
+  -- Backward compatibility: prompt_blend as fallback for mode-specific values
+  if config.prompt_blend ~= nil then
+    if config.prompt_blend_insert == nil then
+      config.prompt_blend_insert = config.prompt_blend
+    end
+    if config.prompt_blend_normal == nil then
+      config.prompt_blend_normal = config.prompt_blend
+    end
+  end
 end
 
 ---Get the configuration
