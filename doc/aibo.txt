@@ -605,7 +605,9 @@ Default key mappings are defined in ftplugin files. These can be customized
 through configuration (see |aibo-customization|).
 
 Console buffer mappings:
-	<CR>		Submit empty line (n)
+	<CR>		Jump to diff location, or submit (n)
+	<C-Enter>	Submit to the tool (n)
+	<F5>		Submit to the tool (n)
 	<C-c>		Send ESC to terminal (n/i)
 	g<C-c>		Send interrupt signal (n)
 	<C-l>		Clear terminal (n)
@@ -654,10 +656,24 @@ All functionality is exposed through <Plug> mappings defined in ftplugin
 files. These can be used to create custom key mappings.
 
 Core <Plug> mappings~
-				*<Plug>(aibo-send)* *<Plug>(aibo-submit)*
+			*<Plug>(aibo-send)* *<Plug>(aibo-submit)*
+			*<Plug>(aibo-jump)* *<Plug>(aibo-jump-or-submit)*
 
 	<Plug>(aibo-send)	Prefix for sending keys to terminal
 	<Plug>(aibo-submit)	Submit content to terminal
+	<Plug>(aibo-jump)	Alias for <Plug>(aibo-jump:tabdrop).
+				Remap this to change the default opener.
+	<Plug>(aibo-jump:edit)	Jump to diff location in current window
+	<Plug>(aibo-jump:split)	Jump to diff location in horizontal split
+	<Plug>(aibo-jump:vsplit)	Jump to diff location in vertical split
+	<Plug>(aibo-jump:tabnew)	Jump to diff location in new tab
+	<Plug>(aibo-jump:drop)	Jump to diff location, reuse existing window
+	<Plug>(aibo-jump:tabdrop)
+				Jump to diff location, reuse existing tab
+				or open new tab
+	<Plug>(aibo-jump-or-submit)
+				Jump to diff location if on a diff line,
+				otherwise submit content to terminal
 
 The `<Plug>(aibo-send)` mapping is designed to be used in two ways:
 
@@ -680,6 +696,29 @@ Common usage patterns:
 	<Plug>(aibo-send)<Up>		Send up arrow
 	<Plug>(aibo-send)<Tab>		Send tab (Claude: accept)
 	<Plug>(aibo-send)<S-Tab>	Send shift-tab (Claude: mode switch)
+
+						*aibo-plug-jump*
+Jump mappings~
+
+The `<Plug>(aibo-jump)` mappings allow you to jump from a diff hunk line
+in the console buffer directly to the corresponding file and line number.
+This works with Claude, Codex, and Gemini CLI tools that display inline
+diffs.
+
+By default, `<CR>` in the console buffer is mapped to
+`<Plug>(aibo-jump-or-submit)`, which jumps to the diff location if
+the cursor is on a diff line, and submits otherwise.
+
+`<Plug>(aibo-jump)` is an alias for `<Plug>(aibo-jump:tabdrop)` by
+default. You can customize the opener by remapping it:
+>
+	-- Use horizontal split instead of new tab for jump
+	vim.keymap.set('n', '<Plug>(aibo-jump)',
+	               '<Plug>(aibo-jump:split)',
+	               { buffer = bufnr, remap = true })
+<
+This also affects `<Plug>(aibo-jump-or-submit)`, since it delegates
+to `<Plug>(aibo-jump)` internally.
 
 Tool-specific implementations~
 						*aibo-plug-claude*

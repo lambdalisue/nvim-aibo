@@ -372,10 +372,12 @@ require('aibo').setup({
 
 Most keys use the `<Plug>(aibo-send)<Key>` pattern to send keys directly to the terminal:
 
-| Key          | Action                          | Implementation            |
-| ------------ | ------------------------------- | ------------------------- |
-| `<CR>`       | Submit empty line               | `<Plug>(aibo-submit)`     |
-| `<C-c>`      | Send ESC to terminal            | `<Plug>(aibo-send)<Esc>`  |
+| Key          | Action                          | Implementation                |
+| ------------ | ------------------------------- | ----------------------------- |
+| `<CR>`       | Jump to diff location or submit | `<Plug>(aibo-jump-or-submit)` |
+| `<C-Enter>`  | Submit to the tool              | `<Plug>(aibo-submit)`         |
+| `<F5>`       | Submit to the tool              | `<Plug>(aibo-submit)`         |
+| `<C-c>`      | Send ESC to terminal            | `<Plug>(aibo-send)<Esc>`      |
 | `g<C-c>`     | Send interrupt signal           | `<Plug>(aibo-send)<C-c>`  |
 | `<C-l>`      | Clear terminal                  | `<Plug>(aibo-send)<C-l>`  |
 | `<C-n>`      | Navigate to next in history     | `<Plug>(aibo-send)<C-n>`  |
@@ -462,12 +464,20 @@ vim.keymap.set('n', '<C-k>', '<Plug>(aibo-submit)<Cmd>q<CR>', opts)
 
 #### Core Mappings (Console and Prompt Buffers)
 
-| <Plug> Mapping              | Description                                     |
-| --------------------------- | ----------------------------------------------- |
-| `<Plug>(aibo-send)`         | Prefix for sending keys to terminal (see below) |
-| `<Plug>(aibo-submit)`       | Submit content to terminal                      |
-| `<Plug>(aibo-history-prev)` | Navigate to previous prompt history entry       |
-| `<Plug>(aibo-history-next)` | Navigate to next prompt history entry           |
+| <Plug> Mapping                | Description                                         |
+| ----------------------------- | --------------------------------------------------- |
+| `<Plug>(aibo-send)`           | Prefix for sending keys to terminal (see below)     |
+| `<Plug>(aibo-submit)`         | Submit content to terminal                          |
+| `<Plug>(aibo-jump)`           | Alias for `<Plug>(aibo-jump:tabdrop)`. Remap to change default opener |
+| `<Plug>(aibo-jump:edit)`      | Jump to diff location in current window             |
+| `<Plug>(aibo-jump:split)`     | Jump to diff location in horizontal split           |
+| `<Plug>(aibo-jump:vsplit)`    | Jump to diff location in vertical split             |
+| `<Plug>(aibo-jump:tabnew)`    | Jump to diff location in new tab                    |
+| `<Plug>(aibo-jump:drop)`     | Jump to diff location, reuse existing window        |
+| `<Plug>(aibo-jump:tabdrop)` | Jump to diff location, reuse existing tab or open new tab |
+| `<Plug>(aibo-jump-or-submit)` | Jump to diff location, or submit if not on diff line|
+| `<Plug>(aibo-history-prev)`   | Navigate to previous prompt history entry           |
+| `<Plug>(aibo-history-next)`   | Navigate to next prompt history entry               |
 
 The `<Plug>(aibo-send)` mapping is designed to be used as a prefix followed by a key:
 
@@ -481,6 +491,22 @@ The `<Plug>(aibo-send)` mapping is designed to be used as a prefix followed by a
 - `<Plug>(aibo-send)<Tab>` - Send tab (Claude: accept)
 - `<Plug>(aibo-send)<S-Tab>` - Send shift-tab (Claude: mode switch)
 - And any other key you want to send to the terminal
+
+#### Jump to Diff Location
+
+When the cursor is on a diff hunk line in the console buffer (supported for Claude, Codex, and Gemini CLI), `<Plug>(aibo-jump)` opens the corresponding file at the exact line number. By default, `<CR>` is mapped to `<Plug>(aibo-jump-or-submit)`, which jumps if on a diff line and submits otherwise.
+
+`<Plug>(aibo-jump)` defaults to `<Plug>(aibo-jump:tabdrop)` (reuse existing tab or open new tab). You can customize the opener by remapping it:
+
+```lua
+-- Use horizontal split instead of new tab for jump
+vim.keymap.set('n', '<Plug>(aibo-jump)', '<Plug>(aibo-jump:split)', {
+  buffer = bufnr,
+  remap = true,
+})
+```
+
+This also affects `<Plug>(aibo-jump-or-submit)`, since it delegates to `<Plug>(aibo-jump)` internally.
 
 #### Claude Tool
 
