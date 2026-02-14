@@ -1,6 +1,8 @@
---- Completion module for Claude Code slash commands in aiboprompt
---- Provides omnifunc-compatible completion for "/" commands
+--- Completion module for Claude Code in aibo prompt
+--- Provides omnifunc-compatible completion for "/" slash commands and "@" file paths
 local M = {}
+
+local file_completion = require("aibo.completion.file")
 
 -- Claude Code built-in slash commands
 -- Reference: https://docs.anthropic.com/en/docs/claude-code/cli-usage
@@ -153,7 +155,7 @@ local function find_slash_start(line, col)
   return slash_pos
 end
 
----Omnifunc for slash command completion
+---Omnifunc for integrated completion (slash commands + file paths)
 ---@param findstart number 1 to find start position, 0 to get completions
 ---@param base string The text to complete (only used when findstart is 0)
 ---@return number|table Start position or completion list
@@ -161,14 +163,26 @@ function M.omnifunc(findstart, base)
   if findstart == 1 then
     local line = vim.api.nvim_get_current_line()
     local col = vim.fn.col(".")
-    local start = find_slash_start(line, col)
 
-    if start then
-      return start - 1 -- Convert to 0-indexed
+    -- Check @ file completion first (since @/ contains "/" which could match slash)
+    local at_start = file_completion.find_at_start(line, col)
+    if at_start then
+      return at_start - 1 -- Convert to 0-indexed
+    end
+
+    -- Then check / slash command completion
+    local slash_start = find_slash_start(line, col)
+    if slash_start then
+      return slash_start - 1 -- Convert to 0-indexed
     end
 
     return -3
   else
+    -- Route to appropriate completion based on trigger character
+    if base:sub(1, 1) == "@" then
+      return file_completion.get_completions(base)
+    end
+
     if base:sub(1, 1) ~= "/" then
       base = "/" .. base
     end

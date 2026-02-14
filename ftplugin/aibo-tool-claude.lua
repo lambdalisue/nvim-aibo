@@ -6,31 +6,64 @@ vim.b.loaded_aibo_agent_claude_ftplugin = true
 local bufnr = vim.api.nvim_get_current_buf()
 local aibo = require("aibo")
 
--- Set up omnifunc for slash command completion (only for prompt buffers)
+-- Completion setup for Claude prompt buffers
+-- Claude Code supports "@" file path references and "/" slash commands.
+-- The completion logic lives in lua/aibo/completion/ (reusable modules);
+-- trigger keymaps and autocmds are Claude-specific and set up here.
 local bufname = vim.api.nvim_buf_get_name(bufnr)
 local is_prompt = bufname:match("^aiboprompt://")
 if is_prompt then
   vim.bo[bufnr].omnifunc = "v:lua.require'aibo.completion.claude'.omnifunc"
-  -- Ensure completion menu doesn't auto-select first item
+  vim.opt_local.completeopt:append("menuone")
   vim.opt_local.completeopt:append("noselect")
 end
 
 -- Default key mappings (unless disabled in config)
 local cfg = aibo.get_tool_config("claude")
 if not (cfg and cfg.no_default_mappings) then
-  -- Auto-trigger slash command completion when "/" is typed at start of line or after whitespace
   if is_prompt then
+    local file_completion = require("aibo.completion.file")
+    local controller = file_completion.setup_auto_completion(bufnr)
+
+    -- Auto-trigger @ file path completion when "@" is typed at start of
+    -- line or after whitespace. Insert "@" and let TextChangedI show popup.
+    vim.keymap.set("i", "@", function()
+      local line = vim.api.nvim_get_current_line()
+      local col = vim.fn.col(".")
+      local before = line:sub(1, col - 1)
+      if before == "" or before:match("%s$") then
+        controller.activate()
+      end
+      return "@"
+    end, { buffer = bufnr, expr = true, silent = true })
+
+    -- Auto-trigger completion when "/" is typed:
+    --   1. At start of line or after whitespace -> slash command completion
+    --      (uses <C-x><C-o> omnifunc — separate from @ completion system)
+    --   2. Within an @ path -> insert "/" and let TextChanged show popup
     vim.keymap.set("i", "/", function()
       local line = vim.api.nvim_get_current_line()
       local col = vim.fn.col(".")
       local before = line:sub(1, col - 1)
-      -- Trigger completion if "/" is at start of line or after whitespace
+      -- Slash command trigger (separate system, uses omnifunc)
       if before == "" or before:match("%s$") then
         return "/<C-x><C-o>"
+      end
+      -- @ file path handling
+      local action = file_completion.handle_slash_key(line, col)
+      if action == "trigger" then
+        controller.activate()
+        vim.schedule(function() controller.show() end)
+        return ""
+      end
+      if action == "insert_and_trigger" then
+        controller.activate()
+        return "/"
       end
       return "/"
     end, { buffer = bufnr, expr = true, silent = true })
   end
+
   local opts = { buffer = bufnr, nowait = true, silent = true }
   vim.keymap.set({ "n" }, "<Tab>", "<Plug>(aibo-send)<Tab>", opts)
   vim.keymap.set({ "n" }, "<S-Tab>", "<Plug>(aibo-send)<S-Tab>", opts)
