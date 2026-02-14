@@ -79,6 +79,59 @@ local function build_info(partial)
   }
 end
 
+-- Map tool command names to their diff parser module paths
+local TOOL_PARSERS = {
+  claude = "aibo.internal.claude_code",
+  codex = "aibo.internal.codex_cli",
+  gemini = "aibo.internal.gemini_cli",
+}
+
+---Check whether the cursor is on a jumpable diff line in the console buffer.
+---@param bufnr number Console buffer number
+---@return boolean True if cursor is on a diff line that can be jumped to
+local function can_jump(bufnr)
+  local info = M.get_info_by_bufnr(bufnr)
+  if not info or not info.jobinfo then
+    return false
+  end
+
+  local parser_module = TOOL_PARSERS[info.jobinfo.cmd]
+  if not parser_module then
+    return false
+  end
+
+  local parser = require(parser_module)
+  return parser.get_cursor_diff_location(bufnr) ~= nil
+end
+
+---Try to jump from the current cursor position to the diff location.
+---Looks up the appropriate diff parser based on the console's tool command,
+---parses the diff location at the cursor, and opens the target file.
+---@param bufnr number Console buffer number
+---@param opener string Vim command to open the file ("split", "vsplit", "tabnew", etc.)
+---@return boolean True if jump succeeded, false otherwise
+local function try_jump(bufnr, opener)
+  local info = M.get_info_by_bufnr(bufnr)
+  if not info or not info.jobinfo then
+    return false
+  end
+
+  local parser_module = TOOL_PARSERS[info.jobinfo.cmd]
+  if not parser_module then
+    return false
+  end
+
+  local parser = require(parser_module)
+  local loc = parser.get_cursor_diff_location(bufnr)
+  if not loc then
+    return false
+  end
+
+  vim.cmd(opener .. " " .. vim.fn.fnameescape(loc.filepath))
+  vim.api.nvim_win_set_cursor(0, { loc.lnum, 0 })
+  return true
+end
+
 ---@param bufnr number Buffer number to set mappings for
 local function setup_mappings(bufnr)
   local aibo = require("aibo")
@@ -118,6 +171,38 @@ local function setup_mappings(bufnr)
   end)
   define("<Plug>(aibo-submit)", "Submit to the tool", function()
     submit("")
+  end)
+  define("<Plug>(aibo-jump:edit)", "Jump to diff location in current window", function()
+    try_jump(bufnr, "edit")
+  end)
+  define("<Plug>(aibo-jump:split)", "Jump to diff location in horizontal split", function()
+    try_jump(bufnr, "split")
+  end)
+  define("<Plug>(aibo-jump:vsplit)", "Jump to diff location in vertical split", function()
+    try_jump(bufnr, "vsplit")
+  end)
+  define("<Plug>(aibo-jump:tabnew)", "Jump to diff location in new tab", function()
+    try_jump(bufnr, "tabnew")
+  end)
+  define("<Plug>(aibo-jump:drop)", "Jump to diff location, reuse existing window", function()
+    try_jump(bufnr, "drop")
+  end)
+  define("<Plug>(aibo-jump:tabdrop)", "Jump to diff location, reuse existing tab or open new tab", function()
+    try_jump(bufnr, "tab drop")
+  end)
+  vim.keymap.set({ "n", "i" }, "<Plug>(aibo-jump)", "<Plug>(aibo-jump:tabdrop)", {
+    buffer = bufnr,
+    desc = "Alias for <Plug>(aibo-jump:tabdrop)",
+    silent = true,
+    remap = true,
+  })
+  define("<Plug>(aibo-jump-or-submit)", "Jump to diff location or submit to the tool", function()
+    if can_jump(bufnr) then
+      local keys = vim.api.nvim_replace_termcodes("<Plug>(aibo-jump)", true, true, true)
+      vim.api.nvim_feedkeys(keys, "m", false)
+    else
+      submit("")
+    end
   end)
 end
 
