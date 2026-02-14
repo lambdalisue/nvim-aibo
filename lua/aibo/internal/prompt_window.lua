@@ -114,7 +114,8 @@ local function apply_mode_style(winid, mode)
   local aibo = require("aibo")
   local config = aibo.get_config()
   if mode == "insert" then
-    vim.wo[winid].winhighlight = "NormalFloat:AiboPromptNormal,FloatBorder:AiboPromptInsertBorder,FloatTitle:AiboPromptInsertTitle"
+    vim.wo[winid].winhighlight =
+      "NormalFloat:AiboPromptNormal,FloatBorder:AiboPromptInsertBorder,FloatTitle:AiboPromptInsertTitle"
     vim.wo[winid].winblend = config.prompt_blend_insert or 10
   else
     vim.wo[winid].winhighlight = "NormalFloat:AiboPromptNormal,FloatBorder:AiboPromptBorder,FloatTitle:AiboPromptTitle"
@@ -401,7 +402,7 @@ function M.open(console_winid, options)
       title = config.prompt_title or " Ctrl+Enter: Submit | Esc: Close | Ctrl+C: Cancel ",
       title_pos = "right",
       focusable = true,
-      zindex = 1,
+      zindex = 49,
     }
 
     -- Create floating window
