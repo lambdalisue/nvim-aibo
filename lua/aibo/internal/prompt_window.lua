@@ -155,6 +155,24 @@ local function setup_mode_autocmds(bufnr)
       end
     end,
   })
+
+  -- WORKAROUND: Reassign winblend on text/cursor changes to fix rendering
+  -- glitches that occur when the Console is running in the background.
+  -- Symptoms include gaps in rendering and deleted characters remaining
+  -- visible. It is unclear whether this truly fixes the issue.
+  -- Trying this workaround since 2026-02-14.
+  vim.api.nvim_create_autocmd({ "TextChangedI", "CursorMovedI" }, {
+    group = mode_augroup,
+    buffer = bufnr,
+    callback = function()
+      local wid = vim.fn.bufwinid(bufnr)
+      if wid == -1 or not vim.api.nvim_win_is_valid(wid) then
+        return
+      end
+      local current = vim.wo[wid].winblend
+      vim.wo[wid].winblend = current
+    end,
+  })
 end
 
 ---@param bufnr number Buffer number
