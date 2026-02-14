@@ -238,7 +238,9 @@ require('aibo').setup({
   submit_delay = 100,         -- Delay in milliseconds (default: 100)
   submit_key = '<CR>',        -- Key to send after submit (default: '<CR>')
   prompt_height = 10,         -- Prompt window height (default: 10)
-  prompt_blend = 20,          -- Prompt window transparency 0-100, 0=opaque 100=transparent (default: 20)
+  prompt_blend_insert = 10,   -- Prompt transparency in Insert mode 0-100 (default: 10)
+  prompt_blend_normal = 30,   -- Prompt transparency in Normal mode 0-100 (default: 30)
+  -- prompt_blend = 20,       -- DEPRECATED: Use prompt_blend_insert/normal instead
   termcode_mode = 'hybrid',   -- Terminal escape sequence mode: 'hybrid', 'xterm', or 'csi-n' (default: 'hybrid')
   disable_startinsert_on_startup = false, -- Disable auto insert in prompt window when first opened (default: false)
   disable_startinsert_on_insert = false,  -- Disable auto insert in prompt when entering insert from console (default: false)
@@ -436,18 +438,24 @@ All Claude-specific keys use the `<Plug>(aibo-send)` pattern to send keys direct
 
 ### Custom Highlight Groups
 
-The plugin defines custom highlight groups for the prompt window that you can customize:
+The plugin defines custom highlight groups for the prompt window that change based on the current mode (Insert vs Normal):
 
 ```vim
 " Customize prompt window colors
 highlight AiboPromptNormal guibg=#1e1e2e guifg=#cdd6f4
-highlight AiboPromptBorder guifg=#89b4fa
+highlight AiboPromptBorder guifg=#7aa2f7
+highlight AiboPromptTitle guifg=#7aa2f7
+highlight AiboPromptInsertBorder guifg=#e0af68
+highlight AiboPromptInsertTitle guifg=#e0af68
 ```
 
 By default, these are linked to:
 
 - `AiboPromptNormal` → `Normal` (inherits your normal background/foreground)
-- `AiboPromptBorder` → `FloatBorder` (inherits your floating window border)
+- `AiboPromptBorder` → `DiagnosticInfo` (border in Normal mode)
+- `AiboPromptTitle` → `DiagnosticInfo` (title in Normal mode)
+- `AiboPromptInsertBorder` → `DiagnosticWarn` (border in Insert mode)
+- `AiboPromptInsertTitle` → `DiagnosticWarn` (title in Insert mode)
 
 ### Using <Plug> Mappings
 
