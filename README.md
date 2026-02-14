@@ -11,7 +11,7 @@ AI Bot Integration and Orchestration for Neovim
 > [!WARNING]
 > This plugin is currently in **beta stage**. The API and features may change.
 
-https://github.com/user-attachments/assets/ff48fe43-bc89-445c-8402-886df4d8e97d
+https://github.com/user-attachments/assets/ebd1e774-eb9b-4feb-bec5-0a237030fd6a
 
 <div align="right">
 <sup>You can find more screencasts in <a href="https://github.com/lambdalisue/nvim-aibo/wiki/Screencast" target="_blank">Screencast</a> page of the repository Wiki</sup>
