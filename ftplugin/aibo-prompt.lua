@@ -32,18 +32,26 @@ if not (cfg and cfg.no_default_mappings) then
   vim.keymap.set("n", "<Up>", "<Plug>(aibo-send)<Up>", opts)
 
   -- History navigation in insert mode (when completion menu is not visible)
-  -- Uses <Plug> mappings defined in prompt_window.lua
+  -- Uses feedkeys with explicit remap control to avoid infinite recursion:
+  -- "n" flag = no remap (for built-in C-n/C-p in popup)
+  -- "m" flag = remap (for <Plug> mapping expansion)
   vim.keymap.set("i", "<C-p>", function()
     if vim.fn.pumvisible() == 1 then
-      return "<C-p>"
+      local key = vim.api.nvim_replace_termcodes("<C-p>", true, false, true)
+      vim.api.nvim_feedkeys(key, "n", false)
+    else
+      local key = vim.api.nvim_replace_termcodes("<Plug>(aibo-history-prev)", true, false, true)
+      vim.api.nvim_feedkeys(key, "m", false)
     end
-    return "<Plug>(aibo-history-prev)"
-  end, { buffer = bufnr, expr = true, remap = true, silent = true })
+  end, { buffer = bufnr, silent = true })
 
   vim.keymap.set("i", "<C-n>", function()
     if vim.fn.pumvisible() == 1 then
-      return "<C-n>"
+      local key = vim.api.nvim_replace_termcodes("<C-n>", true, false, true)
+      vim.api.nvim_feedkeys(key, "n", false)
+    else
+      local key = vim.api.nvim_replace_termcodes("<Plug>(aibo-history-next)", true, false, true)
+      vim.api.nvim_feedkeys(key, "m", false)
     end
-    return "<Plug>(aibo-history-next)"
-  end, { buffer = bufnr, expr = true, remap = true, silent = true })
+  end, { buffer = bufnr, silent = true })
 end
