@@ -148,4 +148,82 @@ T["omnifunc still returns slash commands for / prefix"] = function()
   end
 end
 
+-- Skills discovery tests
+local S = helpers.new_set({
+  hooks = {
+    pre_case = function()
+      -- Create temp .claude/skills directory in cwd
+      -- Skills use <skill-name>/SKILL.md structure
+      local skills_dir = vim.fn.getcwd() .. "/.claude/skills"
+
+      -- Skill with YAML front matter
+      vim.fn.mkdir(skills_dir .. "/tdd-workflow", "p")
+      vim.fn.writefile({
+        "---",
+        "description: Run tests in TDD style",
+        "---",
+        "Run tests using TDD workflow",
+      }, skills_dir .. "/tdd-workflow/SKILL.md")
+
+      -- Skill without front matter
+      vim.fn.mkdir(skills_dir .. "/git-commit", "p")
+      vim.fn.writefile({
+        "# Create a conventional commit",
+        "Help create a commit message",
+      }, skills_dir .. "/git-commit/SKILL.md")
+
+      -- Clear module cache to pick up new skills
+      package.loaded["aibo.completion.claude"] = nil
+    end,
+    post_case = function()
+      -- Clean up temp skills directory
+      vim.fn.delete(vim.fn.getcwd() .. "/.claude/skills", "rf")
+      package.loaded["aibo.completion.claude"] = nil
+    end,
+  },
+})
+T["skills"] = S
+
+S["discovers skills from .claude/skills directory"] = function()
+  local completion = require("aibo.completion.claude")
+
+  local commands = completion.get_commands()
+  local cmd_set = {}
+  for _, cmd in ipairs(commands) do
+    cmd_set[cmd.cmd] = cmd
+  end
+
+  eq(cmd_set["/tdd-workflow"] ~= nil, true)
+  eq(cmd_set["/tdd-workflow"].description, "Run tests in TDD style (skill)")
+end
+
+S["extracts description from first line when no front matter"] = function()
+  local completion = require("aibo.completion.claude")
+
+  local commands = completion.get_commands()
+  local cmd_set = {}
+  for _, cmd in ipairs(commands) do
+    cmd_set[cmd.cmd] = cmd
+  end
+
+  eq(cmd_set["/git-commit"] ~= nil, true)
+  eq(cmd_set["/git-commit"].description, "Create a conventional commit (skill)")
+end
+
+S["skills appear in omnifunc completions"] = function()
+  local completion = require("aibo.completion.claude")
+
+  local completions = completion.omnifunc(0, "/tdd")
+  eq(type(completions), "table")
+
+  local has_tdd = false
+  for _, item in ipairs(completions) do
+    if item.word == "/tdd-workflow" then
+      has_tdd = true
+      break
+    end
+  end
+  eq(has_tdd, true)
+end
+
 return T

@@ -99,12 +99,46 @@ local function find_custom_commands()
   return commands
 end
 
----Get all slash commands (built-in + custom)
+---Find custom skills from .claude/skills directories
+---Skills use the structure: .claude/skills/<skill-name>/SKILL.md
+---@return table[] List of custom skill definitions
+local function find_custom_skills()
+  local skills = {}
+
+  local search_paths = {
+    vim.fn.expand("~/.claude/skills"), -- User global skills
+    vim.fn.getcwd() .. "/.claude/skills", -- Project skills
+  }
+
+  for _, dir in ipairs(search_paths) do
+    if vim.fn.isdirectory(dir) == 1 then
+      local files = vim.fn.glob(dir .. "/*/SKILL.md", false, true)
+      for _, file in ipairs(files) do
+        -- Extract skill name from parent directory
+        local name = vim.fn.fnamemodify(file, ":h:t")
+
+        local description = extract_description(file)
+        table.insert(skills, {
+          cmd = "/" .. name,
+          description = description .. " (skill)",
+        })
+      end
+    end
+  end
+
+  return skills
+end
+
+---Get all slash commands (built-in + custom + skills)
 ---@return table[] List of all command definitions
 local function get_all_commands()
   local commands = vim.deepcopy(BUILTIN_COMMANDS)
   local custom = find_custom_commands()
   for _, cmd in ipairs(custom) do
+    table.insert(commands, cmd)
+  end
+  local skills = find_custom_skills()
+  for _, cmd in ipairs(skills) do
     table.insert(commands, cmd)
   end
   return commands
