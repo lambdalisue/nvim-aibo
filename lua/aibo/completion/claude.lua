@@ -70,10 +70,11 @@ end
 ---@return table[] List of custom command definitions
 local function find_custom_commands()
   local commands = {}
+  local seen = {}
 
-  -- Search locations for custom commands
+  -- Search locations for custom commands (personal takes precedence over project)
   local search_paths = {
-    vim.fn.expand("~/.claude/commands"), -- User global commands
+    vim.fn.expand("~/.claude/commands"), -- User personal commands
     vim.fn.getcwd() .. "/.claude/commands", -- Project commands
   }
 
@@ -87,11 +88,14 @@ local function find_custom_commands()
         local name_with_ext = rel_path:gsub("/", ":") -- Convert path separators to colons
         local name = name_with_ext:gsub("%.md$", "") -- Remove .md extension
 
-        local description = extract_description(file)
-        table.insert(commands, {
-          cmd = "/" .. name,
-          description = description .. " (custom)",
-        })
+        if not seen[name] then
+          seen[name] = true
+          local description = extract_description(file)
+          table.insert(commands, {
+            cmd = "/" .. name,
+            description = description .. " (custom)",
+          })
+        end
       end
     end
   end
@@ -104,9 +108,11 @@ end
 ---@return table[] List of custom skill definitions
 local function find_custom_skills()
   local skills = {}
+  local seen = {}
 
+  -- Personal takes precedence over project
   local search_paths = {
-    vim.fn.expand("~/.claude/skills"), -- User global skills
+    vim.fn.expand("~/.claude/skills"), -- User personal skills
     vim.fn.getcwd() .. "/.claude/skills", -- Project skills
   }
 
@@ -117,11 +123,14 @@ local function find_custom_skills()
         -- Extract skill name from parent directory
         local name = vim.fn.fnamemodify(file, ":h:t")
 
-        local description = extract_description(file)
-        table.insert(skills, {
-          cmd = "/" .. name,
-          description = description .. " (skill)",
-        })
+        if not seen[name] then
+          seen[name] = true
+          local description = extract_description(file)
+          table.insert(skills, {
+            cmd = "/" .. name,
+            description = description .. " (skill)",
+          })
+        end
       end
     end
   end
