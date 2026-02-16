@@ -148,4 +148,208 @@ T["omnifunc still returns slash commands for / prefix"] = function()
   end
 end
 
+-- Skills discovery tests
+local S = helpers.new_set({
+  hooks = {
+    pre_case = function()
+      -- Create temp .claude/skills directory in cwd
+      -- Skills use <skill-name>/SKILL.md structure
+      local skills_dir = vim.fn.getcwd() .. "/.claude/skills"
+
+      -- Skill with YAML front matter
+      vim.fn.mkdir(skills_dir .. "/tdd-workflow", "p")
+      vim.fn.writefile({
+        "---",
+        "description: Run tests in TDD style",
+        "---",
+        "Run tests using TDD workflow",
+      }, skills_dir .. "/tdd-workflow/SKILL.md")
+
+      -- Skill without front matter
+      vim.fn.mkdir(skills_dir .. "/git-commit", "p")
+      vim.fn.writefile({
+        "# Create a conventional commit",
+        "Help create a commit message",
+      }, skills_dir .. "/git-commit/SKILL.md")
+
+      -- Redirect personal skills dir to empty temp dir to avoid conflicts
+      -- with user's real skills (personal takes precedence over project)
+      local empty_personal = vim.fn.getcwd() .. "/.test-empty-personal/.claude/skills"
+      vim.fn.mkdir(empty_personal, "p")
+      _G._original_expand_s = vim.fn.expand
+      vim.fn.expand = function(path)
+        if path == "~/.claude/skills" then
+          return empty_personal
+        elseif path == "~/.claude/commands" then
+          return vim.fn.getcwd() .. "/.test-empty-personal/.claude/commands"
+        end
+        return _G._original_expand_s(path)
+      end
+
+      -- Clear module cache to pick up new skills
+      package.loaded["aibo.completion.claude"] = nil
+    end,
+    post_case = function()
+      -- Clean up temp skills directory
+      vim.fn.delete(vim.fn.getcwd() .. "/.claude/skills", "rf")
+      vim.fn.delete(vim.fn.getcwd() .. "/.test-empty-personal", "rf")
+      vim.fn.expand = _G._original_expand_s
+      _G._original_expand_s = nil
+      package.loaded["aibo.completion.claude"] = nil
+    end,
+  },
+})
+T["skills"] = S
+
+S["discovers skills from .claude/skills directory"] = function()
+  local completion = require("aibo.completion.claude")
+
+  local commands = completion.get_commands()
+  local cmd_set = {}
+  for _, cmd in ipairs(commands) do
+    cmd_set[cmd.cmd] = cmd
+  end
+
+  eq(cmd_set["/tdd-workflow"] ~= nil, true)
+  eq(cmd_set["/tdd-workflow"].description, "Run tests in TDD style (skill)")
+end
+
+S["extracts description from first line when no front matter"] = function()
+  local completion = require("aibo.completion.claude")
+
+  local commands = completion.get_commands()
+  local cmd_set = {}
+  for _, cmd in ipairs(commands) do
+    cmd_set[cmd.cmd] = cmd
+  end
+
+  eq(cmd_set["/git-commit"] ~= nil, true)
+  eq(cmd_set["/git-commit"].description, "Create a conventional commit (skill)")
+end
+
+S["skills appear in omnifunc completions"] = function()
+  local completion = require("aibo.completion.claude")
+
+  local completions = completion.omnifunc(0, "/tdd")
+  eq(type(completions), "table")
+
+  local has_tdd = false
+  for _, item in ipairs(completions) do
+    if item.word == "/tdd-workflow" then
+      has_tdd = true
+      break
+    end
+  end
+  eq(has_tdd, true)
+end
+
+-- Duplicate skill tests
+local D = helpers.new_set({
+  hooks = {
+    pre_case = function()
+      -- Create the same skill in both user global and project directories
+      -- to simulate duplicate skill names
+      local user_skills_dir = vim.fn.getcwd() .. "/.test-home/.claude/skills"
+      local project_skills_dir = vim.fn.getcwd() .. "/.claude/skills"
+
+      -- User global skill
+      vim.fn.mkdir(user_skills_dir .. "/my-skill", "p")
+      vim.fn.writefile({
+        "---",
+        "description: User global version",
+        "---",
+        "Global skill content",
+      }, user_skills_dir .. "/my-skill/SKILL.md")
+
+      -- Project skill with same name
+      vim.fn.mkdir(project_skills_dir .. "/my-skill", "p")
+      vim.fn.writefile({
+        "---",
+        "description: Project version",
+        "---",
+        "Project skill content",
+      }, project_skills_dir .. "/my-skill/SKILL.md")
+
+      -- Also create a unique skill in each location
+      vim.fn.mkdir(user_skills_dir .. "/only-global", "p")
+      vim.fn.writefile({
+        "---",
+        "description: Only in global",
+        "---",
+      }, user_skills_dir .. "/only-global/SKILL.md")
+
+      vim.fn.mkdir(project_skills_dir .. "/only-project", "p")
+      vim.fn.writefile({
+        "---",
+        "description: Only in project",
+        "---",
+      }, project_skills_dir .. "/only-project/SKILL.md")
+
+      -- Patch vim.fn.expand to redirect ~ to our test home
+      _G._original_expand = vim.fn.expand
+      vim.fn.expand = function(path)
+        if path == "~/.claude/skills" then
+          return vim.fn.getcwd() .. "/.test-home/.claude/skills"
+        elseif path == "~/.claude/commands" then
+          return vim.fn.getcwd() .. "/.test-home/.claude/commands"
+        end
+        return _G._original_expand(path)
+      end
+
+      package.loaded["aibo.completion.claude"] = nil
+    end,
+    post_case = function()
+      vim.fn.delete(vim.fn.getcwd() .. "/.test-home", "rf")
+      vim.fn.delete(vim.fn.getcwd() .. "/.claude/skills", "rf")
+      vim.fn.expand = _G._original_expand
+      _G._original_expand = nil
+      package.loaded["aibo.completion.claude"] = nil
+    end,
+  },
+})
+T["dedup"] = D
+
+D["does not include duplicate skills when same name exists in both dirs"] = function()
+  local completion = require("aibo.completion.claude")
+
+  local commands = completion.get_commands()
+  local count = 0
+  for _, cmd in ipairs(commands) do
+    if cmd.cmd == "/my-skill" then
+      count = count + 1
+    end
+  end
+  eq(count, 1)
+end
+
+D["personal skill takes precedence over project skill"] = function()
+  local completion = require("aibo.completion.claude")
+
+  local commands = completion.get_commands()
+  local found = nil
+  for _, cmd in ipairs(commands) do
+    if cmd.cmd == "/my-skill" then
+      found = cmd
+      break
+    end
+  end
+
+  eq(found ~= nil, true)
+  eq(found.description, "User global version (skill)")
+end
+
+D["includes all unique skills from both dirs"] = function()
+  local completion = require("aibo.completion.claude")
+
+  local commands = completion.get_commands()
+  local cmd_set = {}
+  for _, cmd in ipairs(commands) do
+    cmd_set[cmd.cmd] = true
+  end
+
+  eq(cmd_set["/my-skill"], true)
+  eq(cmd_set["/only-global"], true)
+  eq(cmd_set["/only-project"], true)
+end
+
 return T
