@@ -595,6 +595,21 @@ vim.api.nvim_create_autocmd("QuitPre", {
   nested = false,
   callback = QuitPre,
 })
+vim.api.nvim_create_autocmd("VimResized", {
+  group = augroup,
+  callback = function()
+    local aibo = require("aibo")
+    local config = aibo.get_config()
+    for winid, console_winid in pairs(active_prompt_wins) do
+      if vim.api.nvim_win_is_valid(winid) and vim.api.nvim_win_is_valid(console_winid) then
+        local new_config = make_full_float_config(console_winid, config)
+        vim.api.nvim_win_set_config(winid, new_config)
+      else
+        active_prompt_wins[winid] = nil
+      end
+    end
+  end,
+})
 
 -- Exposed for testing only
 M._compute_float_config = compute_float_config

@@ -101,6 +101,15 @@ T["aibo_prompt_internal autocmd group is created"] = function()
   eq(found, true)
 end
 
+T["VimResized autocmd is registered in aibo_prompt_internal group"] = function()
+  local autocmds = vim.api.nvim_get_autocmds({
+    group = "aibo_prompt_internal",
+    event = "VimResized",
+  })
+
+  eq(#autocmds > 0, true)
+end
+
 -- Test compute_float_config geometry calculations
 T["compute_float_config returns correct geometry for standard console"] = function()
   local prompt = require("aibo.internal.prompt_window")
