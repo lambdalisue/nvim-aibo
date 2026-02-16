@@ -101,6 +101,86 @@ T["aibo_prompt_internal autocmd group is created"] = function()
   eq(found, true)
 end
 
+T["VimResized autocmd is registered in aibo_prompt_internal group"] = function()
+  local autocmds = vim.api.nvim_get_autocmds({
+    group = "aibo_prompt_internal",
+    event = "VimResized",
+  })
+
+  eq(#autocmds > 0, true)
+end
+
+-- Test compute_float_config geometry calculations
+T["compute_float_config returns correct geometry for standard console"] = function()
+  local prompt = require("aibo.internal.prompt_window")
+
+  local bufnr = vim.api.nvim_create_buf(false, true)
+  local winid = vim.api.nvim_open_win(bufnr, false, {
+    relative = "editor",
+    width = 80,
+    height = 24,
+    row = 0,
+    col = 0,
+  })
+
+  local config = { prompt_height = 10 }
+  local result = prompt._compute_float_config(winid, config)
+
+  eq(result.relative, "win")
+  eq(result.win, winid)
+  eq(result.height, 10)
+  eq(result.width, 78) -- 80 - 2 for border
+  eq(result.col, 0)
+  eq(result.row, 12) -- 24 - 10 - 2
+
+  vim.api.nvim_win_close(winid, true)
+  vim.api.nvim_buf_delete(bufnr, { force = true })
+end
+
+T["compute_float_config clamps prompt_height to console size"] = function()
+  local prompt = require("aibo.internal.prompt_window")
+
+  local bufnr = vim.api.nvim_create_buf(false, true)
+  local winid = vim.api.nvim_open_win(bufnr, false, {
+    relative = "editor",
+    width = 40,
+    height = 5,
+    row = 0,
+    col = 0,
+  })
+
+  local config = { prompt_height = 20 }
+  local result = prompt._compute_float_config(winid, config)
+
+  eq(result.height, 3) -- Clamped to console_height - 2 = 5 - 2 = 3
+  eq(result.row, 0) -- max(0, 5 - 3 - 2) = 0
+  eq(result.width, 38) -- 40 - 2
+
+  vim.api.nvim_win_close(winid, true)
+  vim.api.nvim_buf_delete(bufnr, { force = true })
+end
+
+T["compute_float_config uses default prompt_height when not specified"] = function()
+  local prompt = require("aibo.internal.prompt_window")
+
+  local bufnr = vim.api.nvim_create_buf(false, true)
+  local winid = vim.api.nvim_open_win(bufnr, false, {
+    relative = "editor",
+    width = 80,
+    height = 30,
+    row = 0,
+    col = 0,
+  })
+
+  local config = {}
+  local result = prompt._compute_float_config(winid, config)
+
+  eq(result.height, 10) -- Default prompt_height
+
+  vim.api.nvim_win_close(winid, true)
+  vim.api.nvim_buf_delete(bufnr, { force = true })
+end
+
 -- Test find_info_in_tabpage
 T["find_info_in_tabpage returns nil when no prompt"] = function()
   local prompt = require("aibo.internal.prompt_window")
