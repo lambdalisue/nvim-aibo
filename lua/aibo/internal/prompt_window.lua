@@ -19,6 +19,10 @@
 local M = {}
 local PREFIX = "aiboprompt"
 
+--- Registry of active prompt windows for efficient VimResized handling.
+--- Maps prompt window ID to its parent console window ID.
+local active_prompt_wins = {}
+
 ---@alias PromptInfo { winid: number, bufnr: number, bufname: string, console_info: ConsoleInfo? }
 
 ---@param bufname string
@@ -341,6 +345,46 @@ function M.find_info_in_tabpage()
   return M.get_info_by_console_winid(console_info.winid)
 end
 
+--- Compute geometry-only float config for a prompt window.
+--- Returns position and size properties relative to the given console window.
+---@param console_winid number The parent console window ID
+---@param config table Plugin config (used for prompt_height)
+---@return table Float config with relative, win, row, col, width, height
+local function compute_float_config(console_winid, config)
+  local console_height = vim.api.nvim_win_get_height(console_winid)
+  local console_width = vim.api.nvim_win_get_width(console_winid)
+  local prompt_height = config.prompt_height or 10
+  -- Clamp prompt_height to fit within console (account for border which takes 2 rows)
+  prompt_height = math.min(prompt_height, math.max(1, console_height - 2))
+  -- Position at bottom with border space; ensure row is never negative
+  local row = math.max(0, console_height - prompt_height - 2)
+  return {
+    relative = "win",
+    win = console_winid,
+    row = row,
+    col = 0,
+    width = math.max(1, console_width - 2), -- Account for rounded border
+    height = prompt_height,
+  }
+end
+
+--- Build complete float config with both geometry and style properties.
+--- Used by M.open (initial creation) and VimResized (reposition) to ensure
+--- all window properties are consistently set.
+---@param console_winid number The parent console window ID
+---@param config table Plugin config
+---@return table Complete float config for nvim_open_win / nvim_win_set_config
+local function make_full_float_config(console_winid, config)
+  local float_config = compute_float_config(console_winid, config)
+  float_config.style = "minimal"
+  float_config.border = "rounded"
+  float_config.title = config.prompt_title or " Ctrl+Enter: Submit | Esc: Close | Ctrl+C: Cancel "
+  float_config.title_pos = "right"
+  float_config.focusable = true
+  float_config.zindex = 49
+  return float_config
+end
+
 --- Open or reopen a prompt window for a console.
 --- Creates a new prompt buffer or reuses an existing one. The prompt window
 --- is opened as a floating window at the bottom of the console window.
@@ -394,37 +438,10 @@ function M.open(console_winid, options)
   -- Check if window already exists
   local winid = vim.fn.bufwinid(bufnr)
   if winid == -1 then
-    -- Get console window dimensions
-    local console_height = vim.api.nvim_win_get_height(console_winid)
-    local console_width = vim.api.nvim_win_get_width(console_winid)
-
-    -- Calculate floating window position and size
-    local prompt_height = config.prompt_height or 10
-    -- Clamp prompt_height to fit within console (account for border which takes 2 rows)
-    prompt_height = math.min(prompt_height, math.max(1, console_height - 2))
-    local row = console_height - prompt_height - 2 -- Position at bottom with border space
-    -- Ensure row is never negative
-    row = math.max(0, row)
-    local col = 0
-
-    -- Create floating window configuration
-    local float_config = {
-      relative = "win",
-      win = console_winid,
-      row = row,
-      col = col,
-      width = math.max(1, console_width - 2), -- Account for rounded border
-      height = prompt_height,
-      style = "minimal",
-      border = "rounded",
-      title = config.prompt_title or " Ctrl+Enter: Submit | Esc: Close | Ctrl+C: Cancel ",
-      title_pos = "right",
-      focusable = true,
-      zindex = 49,
-    }
-
     -- Create floating window
+    local float_config = make_full_float_config(console_winid, config)
     winid = vim.api.nvim_open_win(bufnr, true, float_config)
+    active_prompt_wins[winid] = console_winid
   else
     -- Window already exists, just focus it
     vim.api.nvim_set_current_win(winid)
@@ -578,5 +595,9 @@ vim.api.nvim_create_autocmd("QuitPre", {
   nested = false,
   callback = QuitPre,
 })
+
+-- Exposed for testing only
+M._compute_float_config = compute_float_config
+M._active_prompt_wins = active_prompt_wins
 
 return M
