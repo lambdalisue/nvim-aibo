@@ -72,6 +72,8 @@ T["known slash commands are present"] = function()
   eq(cmd_set["/model"], true)
   eq(cmd_set["/resume"], true)
   eq(cmd_set["/compact"], true)
+  eq(cmd_set["/remote-control"], true)
+  eq(cmd_set["/rc"], true)
 end
 
 -- Test completion item structure
