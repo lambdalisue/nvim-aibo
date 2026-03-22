@@ -470,7 +470,7 @@ function M.open(console_winid, options)
   if buffer_cfg.on_attach then
     buffer_cfg.on_attach(bufnr, info)
   end
-  local tool_cfg = aibo.get_tool_config(console_info.cmd)
+  local tool_cfg = aibo.get_tool_config(info.cmd)
   if tool_cfg.on_attach then
     tool_cfg.on_attach(bufnr, info)
   end
