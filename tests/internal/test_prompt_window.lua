@@ -239,6 +239,168 @@ T["open creates prompt window for console"] = function()
   prompt.open = original_open
 end
 
+T["open calls buffer on_attach callback with correct info"] = function()
+  local aibo = require("aibo")
+  local prompt = require("aibo.internal.prompt_window")
+  local console = require("aibo.internal.console_window")
+
+  local called_with = nil
+  aibo.setup({
+    prompt = {
+      on_attach = function(bufnr, info)
+        called_with = { bufnr = bufnr, info = info }
+      end,
+    },
+  })
+
+  local console_bufnr = vim.api.nvim_create_buf(false, true)
+  local console_winid = vim.api.nvim_open_win(console_bufnr, true, {
+    relative = "editor",
+    width = 80,
+    height = 24,
+    row = 0,
+    col = 0,
+  })
+
+  local original_get_info = console.get_info_by_winid
+  console.get_info_by_winid = function(winid)
+    return {
+      winid = winid,
+      bufnr = console_bufnr,
+      bufname = "aiboconsole://test//",
+      jobinfo = {
+        cmd = "test",
+        args = { "--flag" },
+        job_id = 42,
+      },
+    }
+  end
+
+  local result = prompt.open(console_winid)
+
+  eq(called_with ~= nil, true)
+  eq(called_with.info.type, "prompt")
+  eq(called_with.info.cmd, "test")
+  eq(called_with.info.args[1], "--flag")
+  eq(called_with.info.job_id, 42)
+  eq(called_with.bufnr, result.bufnr)
+
+  console.get_info_by_winid = original_get_info
+  if vim.api.nvim_win_is_valid(result.winid) then
+    vim.api.nvim_win_close(result.winid, true)
+  end
+  vim.api.nvim_win_close(console_winid, true)
+  vim.api.nvim_buf_delete(console_bufnr, { force = true })
+  package.loaded["aibo"] = nil
+end
+
+T["open calls tool on_attach callback with correct cmd"] = function()
+  local aibo = require("aibo")
+  local prompt = require("aibo.internal.prompt_window")
+  local console = require("aibo.internal.console_window")
+
+  local tool_called_with = nil
+  aibo.setup({
+    tools = {
+      test = {
+        on_attach = function(bufnr, info)
+          tool_called_with = { bufnr = bufnr, info = info }
+        end,
+      },
+    },
+  })
+
+  local console_bufnr = vim.api.nvim_create_buf(false, true)
+  local console_winid = vim.api.nvim_open_win(console_bufnr, true, {
+    relative = "editor",
+    width = 80,
+    height = 24,
+    row = 0,
+    col = 0,
+  })
+
+  local original_get_info = console.get_info_by_winid
+  console.get_info_by_winid = function(winid)
+    return {
+      winid = winid,
+      bufnr = console_bufnr,
+      bufname = "aiboconsole://test//",
+      jobinfo = {
+        cmd = "test",
+        args = { "--flag" },
+        job_id = 42,
+      },
+    }
+  end
+
+  local result = prompt.open(console_winid)
+
+  eq(tool_called_with ~= nil, true)
+  eq(tool_called_with.info.cmd, "test")
+  eq(tool_called_with.info.args[1], "--flag")
+  eq(tool_called_with.bufnr, result.bufnr)
+
+  console.get_info_by_winid = original_get_info
+  if vim.api.nvim_win_is_valid(result.winid) then
+    vim.api.nvim_win_close(result.winid, true)
+  end
+  vim.api.nvim_win_close(console_winid, true)
+  vim.api.nvim_buf_delete(console_bufnr, { force = true })
+  package.loaded["aibo"] = nil
+end
+
+T["open does not call tool on_attach for unconfigured tool"] = function()
+  local aibo = require("aibo")
+  local prompt = require("aibo.internal.prompt_window")
+  local console = require("aibo.internal.console_window")
+
+  local tool_called = false
+  aibo.setup({
+    tools = {
+      other = {
+        on_attach = function()
+          tool_called = true
+        end,
+      },
+    },
+  })
+
+  local console_bufnr = vim.api.nvim_create_buf(false, true)
+  local console_winid = vim.api.nvim_open_win(console_bufnr, true, {
+    relative = "editor",
+    width = 80,
+    height = 24,
+    row = 0,
+    col = 0,
+  })
+
+  local original_get_info = console.get_info_by_winid
+  console.get_info_by_winid = function(winid)
+    return {
+      winid = winid,
+      bufnr = console_bufnr,
+      bufname = "aiboconsole://test//",
+      jobinfo = {
+        cmd = "test",
+        args = { "--flag" },
+        job_id = 1,
+      },
+    }
+  end
+
+  local result = prompt.open(console_winid)
+
+  eq(tool_called, false)
+
+  console.get_info_by_winid = original_get_info
+  if vim.api.nvim_win_is_valid(result.winid) then
+    vim.api.nvim_win_close(result.winid, true)
+  end
+  vim.api.nvim_win_close(console_winid, true)
+  vim.api.nvim_buf_delete(console_bufnr, { force = true })
+  package.loaded["aibo"] = nil
+end
+
 -- Test write function
 T["write updates prompt buffer content"] = function()
   local prompt = require("aibo.internal.prompt_window")
