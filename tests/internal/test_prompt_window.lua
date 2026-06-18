@@ -126,12 +126,18 @@ T["compute_float_config returns correct geometry for standard console"] = functi
   local config = { prompt_height = 10 }
   local result = prompt._compute_float_config(winid, config)
 
+  -- The editor may clamp the requested window size (e.g. the cmdline steals a
+  -- row in a headless 24-line UI), so assert against the window's actual size
+  -- rather than the requested 80x24 to keep the test environment-independent.
+  local console_width = vim.api.nvim_win_get_width(winid)
+  local console_height = vim.api.nvim_win_get_height(winid)
+
   eq(result.relative, "win")
   eq(result.win, winid)
   eq(result.height, 10)
-  eq(result.width, 78) -- 80 - 2 for border
+  eq(result.width, math.max(1, console_width - 2)) -- mirror compute_float_config's border clamp
   eq(result.col, 0)
-  eq(result.row, 12) -- 24 - 10 - 2
+  eq(result.row + result.height + 2, console_height) -- bottom-anchored with border
 
   vim.api.nvim_win_close(winid, true)
   vim.api.nvim_buf_delete(bufnr, { force = true })
@@ -510,12 +516,27 @@ T["submit sends prompt content to console"] = function()
   local chan = vim.api.nvim_open_term(console_bufnr, {})
   vim.b[console_bufnr].terminal_job_id = chan
 
-  -- Create and setup prompt buffer
-  local console_winid = 1234
+  -- Open a real window for the console so the prompt can resolve its
+  -- console_info from the live window id. A hardcoded id would only resolve
+  -- when some other window happens to own it, making the test flaky.
+  local console_winid = vim.api.nvim_open_win(console_bufnr, false, {
+    relative = "editor",
+    width = 40,
+    height = 10,
+    row = 0,
+    col = 0,
+  })
+
+  -- Create and setup prompt buffer linked to the real console window
   local prompt_bufname = "aiboprompt://" .. console_winid
   local prompt_bufnr = vim.fn.bufadd(prompt_bufname)
-  vim.b[prompt_bufnr].aibo_console_bufnr = console_bufnr
   vim.api.nvim_buf_set_lines(prompt_bufnr, 0, -1, false, { "Test submission" })
+
+  -- Guard: the prompt must actually resolve the console, otherwise submit
+  -- silently returns before reaching console.follow and the test below would
+  -- pass for the wrong reason.
+  local info = prompt.get_info_by_bufnr(prompt_bufnr)
+  eq(info ~= nil and info.console_info ~= nil, true)
 
   local original_follow = console.follow
   local followed = nil
@@ -533,6 +554,9 @@ T["submit sends prompt content to console"] = function()
   eq(followed, console_bufnr)
 
   console.follow = original_follow
+  if vim.api.nvim_win_is_valid(console_winid) then
+    vim.api.nvim_win_close(console_winid, true)
+  end
 end
 
 return T
