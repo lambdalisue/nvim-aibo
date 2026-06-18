@@ -18,6 +18,20 @@ local T = helpers.new_set({
     post_case = function()
       -- Restore original inputlist
       vim.fn.inputlist = original_inputlist
+      -- Close leaked windows and wipe aibo buffers so a case never inherits
+      -- another case's console/prompt windows. Otherwise several console
+      -- windows coexist in the tabpage and AiboSend's disambiguation falls back
+      -- to nvim_tabpage_list_wins order, which differs across Neovim versions
+      -- (observed as a v0.10.0-only failure of "AiboSend -input option").
+      local wins = vim.api.nvim_tabpage_list_wins(0)
+      for i = 2, #wins do
+        pcall(vim.api.nvim_win_close, wins[i], true)
+      end
+      for _, b in ipairs(vim.api.nvim_list_bufs()) do
+        if vim.api.nvim_buf_get_name(b):match("^aibo%a*://") then
+          pcall(vim.api.nvim_buf_delete, b, { force = true })
+        end
+      end
     end,
   },
 })
