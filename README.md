@@ -326,6 +326,43 @@ require('aibo').setup({
     --   completion = { claude = true },
     -- },
   },
+
+  -- Live "/" completion sources, one key per tool. Each source probes the
+  -- agent's own live command/skill list -- no static table, no disk scan --
+  -- so it needs no manual updates and can't drift out of sync. No prompt is
+  -- ever sent, so it consumes no tokens.
+  completion = {
+    -- Claude does not speak ACP itself; probes `claude` directly. Needs
+    -- nothing beyond a logged-in `claude` already on PATH -- no adapter,
+    -- no Node.js, no npm. On by default: there is no static fallback, so
+    -- setting this to `false` means no "/" completion at all for Claude.
+    claude = true,
+    -- claude = {
+    --   cmd = { "claude" }, -- command to probe, looked up on PATH
+    --   timeout = 10000,    -- probe timeout (ms)
+    -- },
+    -- claude = false,      -- disable "/" completion for Claude entirely
+
+    -- Codex does not speak ACP itself; probes `codex app-server` directly.
+    -- Needs nothing beyond `codex` already on PATH. On by default: there is
+    -- no static fallback, so `false` means no "/" completion for Codex.
+    codex = true,
+    -- codex = {
+    --   cmd = { "codex" },
+    --   timeout = 10000,
+    -- },
+    -- codex = false,       -- disable "/" completion for Codex entirely
+
+    -- Generic Agent Client Protocol (ACP) client, for agents that speak ACP
+    -- natively. Currently used by Gemini CLI (`gemini --acp`). On by
+    -- default: same reasoning as Claude/Codex -- no static fallback.
+    acp = true,
+    -- acp = {
+    --   cmd = { "gemini", "--acp" },
+    --   timeout = 10000,
+    -- },
+    -- acp = false,         -- disable "/" completion for Gemini entirely
+  },
 })
 ```
 
@@ -404,6 +441,8 @@ require('aibo').setup({
 > [!NOTE]
 >
 > `<C-g><C-o>` enters a special mode where you can press any single key to send it to the terminal. Useful for sending arbitrary keys not mapped by default.
+>
+> `<C-g>i` (or `<C-g><C-i>`) enters Direct mode, where every key you press is forwarded to the terminal until you press `<Esc>`. `<Esc>` itself is never forwarded — press `<C-c>` while in Direct mode to send ESC to the tool. While active, a 5-line window with a thick red border appears at the top of the console explaining the mode; the prompt window (if shown) is hidden for the duration and reopened in the same state afterwards.
 
 ### Console Buffer
 
@@ -422,6 +461,7 @@ Most keys use the `<Plug>(aibo-send)<Key>` pattern to send keys directly to the 
 | `<Down>`     | Send down arrow                 | `<Plug>(aibo-send)<Down>` |
 | `<Up>`       | Send up arrow                   | `<Plug>(aibo-send)<Up>`   |
 | `<C-g><C-o>` | Send any single key (n)         | `<Plug>(aibo-send)`       |
+| `<C-g>i` / `<C-g><C-i>` | Enter Direct mode (n) | `<Plug>(aibo-direct)` |
 
 ### Prompt Buffer
 
@@ -434,6 +474,7 @@ Most keys use the `<Plug>(aibo-send)<Key>` pattern to send keys directly to the 
 | `<C-p>`       | Previous history or completion (i) | `<Plug>(aibo-history-prev)`     |
 | `<C-n>`       | Next history or completion (i)     | `<Plug>(aibo-history-next)`     |
 | `<C-g><C-o>`  | Send any single key (n/i)          | `<Plug>(aibo-send)`             |
+| `<C-g>i` / `<C-g><C-i>` | Enter Direct mode (n/i) | `<Plug>(aibo-direct)` |
 
 > [!NOTE]
 > `<C-p>` and `<C-n>` in insert mode intelligently switch between history navigation and completion menu navigation. When the completion popup menu is visible, they navigate the completion menu. When the popup is not visible, they navigate through your prompt history.

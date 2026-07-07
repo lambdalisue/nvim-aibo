@@ -624,6 +624,7 @@ Console buffer mappings:
 	<Down>		Send down arrow (n)
 	<Up>		Send up arrow (n)
 	<C-g><C-o>	Send any single key (n)
+	<C-g>i		Enter Direct mode (n, also <C-g><C-i>)
 
 Prompt buffer mappings:
 	<CR>		Submit content (n)
@@ -631,9 +632,18 @@ Prompt buffer mappings:
 	<C-Enter>	Submit and close (n/i)
 	<F5>		Submit and close (n/i)
 	<C-g><C-o>	Send any single key (n/i)
+	<C-g>i		Enter Direct mode (n/i, also <C-g><C-i>)
 
 Note: Press <C-g><C-o> followed by any key to send that key to the terminal.
 This is useful for sending keys not mapped by default.
+
+Note: Press <C-g>i (or <C-g><C-i>) to enter Direct mode, where every key you
+press is forwarded to the terminal until you press <Esc>. <Esc> itself is
+never forwarded to the tool; press <C-c> while in Direct mode if you need to
+send ESC. While active, a 5-line window with a thick red border is shown at
+the top of the console explaining the mode. If the prompt window is
+visible it is hidden for the duration and reopened in the same Normal or
+Insert state once Direct mode ends.
 
 Claude tool mappings:
 	<Tab>		Toggle think (n/i)
@@ -664,10 +674,12 @@ All functionality is exposed through <Plug> mappings defined in ftplugin
 files. These can be used to create custom key mappings.
 
 Core <Plug> mappings~
-			*<Plug>(aibo-send)* *<Plug>(aibo-submit)*
+			*<Plug>(aibo-send)* *<Plug>(aibo-direct)* *<Plug>(aibo-submit)*
 			*<Plug>(aibo-jump)* *<Plug>(aibo-jump-or-submit)*
 
 	<Plug>(aibo-send)	Prefix for sending keys to terminal
+	<Plug>(aibo-direct)	Enter Direct mode: forward every key to the
+				terminal until <Esc> is pressed
 	<Plug>(aibo-submit)	Submit content to terminal
 	<Plug>(aibo-jump)	Alias for <Plug>(aibo-jump:tabdrop).
 				Remap this to change the default opener.
@@ -693,6 +705,15 @@ The `<Plug>(aibo-send)` mapping is designed to be used in two ways:
 
 It automatically converts Vim key notation to terminal escape sequences
 and sends them to the underlying process.
+
+The `<Plug>(aibo-direct)` mapping (mapped to <C-g>i / <C-g><C-i> by default)
+repeats the same single-key capture used by `<Plug>(aibo-send)`, forwarding
+each captured key until <Esc> is pressed. <Esc> is never forwarded to the
+tool; use <C-c> from within Direct mode to send ESC instead. While active, a
+fixed 5-line window with a thick red border and the title "Direct mode" is
+shown at the top of the console, explaining the mode and how to exit it.
+If the prompt window is visible, it is hidden for the duration and reopened
+in the same Normal or Insert state once Direct mode ends.
 
 Common usage patterns:
 	<Plug>(aibo-send)<Esc>		Send ESC to terminal

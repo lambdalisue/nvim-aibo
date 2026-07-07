@@ -20,6 +20,8 @@ local cfg = aibo.get_buffer_config("console")
 if not (cfg and cfg.no_default_mappings) then
   local opts = { buffer = bufnr, nowait = true, silent = true }
   vim.keymap.set("n", "<C-g><C-o>", "<Plug>(aibo-send)", { buffer = bufnr, nowait = true })
+  vim.keymap.set("n", "<C-g>i", "<Plug>(aibo-direct)", { buffer = bufnr, nowait = true })
+  vim.keymap.set("n", "<C-g><C-i>", "<Plug>(aibo-direct)", { buffer = bufnr, nowait = true })
   vim.keymap.set("n", "<CR>", "<Plug>(aibo-jump-or-submit)", opts)
   vim.keymap.set("n", "<C-Enter>", "<Plug>(aibo-submit)", opts)
   vim.keymap.set("n", "<F5>", "<Plug>(aibo-submit)", opts)

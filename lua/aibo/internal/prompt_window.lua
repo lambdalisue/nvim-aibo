@@ -89,6 +89,9 @@ local function setup_highlights()
   vim.api.nvim_set_hl(0, "AiboPromptTitle", { default = true, link = "DiagnosticInfo" })
   vim.api.nvim_set_hl(0, "AiboPromptInsertBorder", { default = true, link = "DiagnosticWarn" })
   vim.api.nvim_set_hl(0, "AiboPromptInsertTitle", { default = true, link = "DiagnosticWarn" })
+  -- Shared with aibo.internal.direct_mode's console overlay window.
+  vim.api.nvim_set_hl(0, "AiboDirectBorder", { default = true, link = "DiagnosticError" })
+  vim.api.nvim_set_hl(0, "AiboDirectTitle", { default = true, link = "DiagnosticError" })
 end
 
 --- Ensure prompt highlight groups are defined (once per session).
@@ -105,6 +108,10 @@ local function ensure_highlights()
     callback = setup_highlights,
   })
 end
+
+-- Exposed so aibo.internal.direct_mode can ensure the shared highlight
+-- groups exist before styling its own overlay window.
+M.ensure_highlights = ensure_highlights
 
 --- Apply mode-specific highlights and winblend to prompt window.
 --- In Insert mode, uses AiboPromptInsertBorder/Title and lower winblend (more opaque).
@@ -207,6 +214,23 @@ local function setup_mappings(bufnr)
     if key then
       send(key)
     end
+  end)
+  define("<Plug>(aibo-direct)", "Enter Direct mode: forward every key to associated console until <Esc>", function()
+    local winid = vim.api.nvim_get_current_win()
+    local info = M.get_info_by_winid(winid)
+    if not info or not info.console_info then
+      return
+    end
+    -- Resolve the target bufnr up front rather than inside send_fn: entering
+    -- Direct mode from the prompt closes the prompt window itself (to show
+    -- the indicator instead), so send_fn can no longer rely on "current
+    -- window" being the prompt by the time it's called from the loop.
+    local console_bufnr = info.console_info.bufnr
+    local direct_mode = require("aibo.internal.direct_mode")
+    direct_mode.enter(info.console_info.winid, function(key)
+      local code = aibo.resolve(key) or key
+      console.send(console_bufnr, code)
+    end)
   end)
   define("<Plug>(aibo-submit)", "Submit prompt to associated console", function()
     vim.cmd("write")
