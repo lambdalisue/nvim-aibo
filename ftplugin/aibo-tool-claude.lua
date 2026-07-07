@@ -13,55 +13,14 @@ local aibo = require("aibo")
 local bufname = vim.api.nvim_buf_get_name(bufnr)
 local is_prompt = bufname:match("^aiboprompt://")
 if is_prompt then
-  vim.bo[bufnr].omnifunc = "v:lua.require'aibo.completion.claude'.omnifunc"
-  vim.opt_local.completeopt:append("menuone")
-  vim.opt_local.completeopt:append("noselect")
+  require("aibo.completion.prompt_ftplugin").setup_completion(bufnr, "claude", "claude")
 end
 
 -- Default key mappings (unless disabled in config)
 local cfg = aibo.get_tool_config("claude")
 if not (cfg and cfg.no_default_mappings) then
   if is_prompt then
-    local file_completion = require("aibo.completion.file")
-    local controller = file_completion.setup_auto_completion(bufnr)
-
-    -- Auto-trigger @ file path completion when "@" is typed at start of
-    -- line or after whitespace. Insert "@" and let TextChangedI show popup.
-    vim.keymap.set("i", "@", function()
-      local line = vim.api.nvim_get_current_line()
-      local col = vim.fn.col(".")
-      local before = line:sub(1, col - 1)
-      if before == "" or before:match("%s$") then
-        controller.activate()
-      end
-      return "@"
-    end, { buffer = bufnr, expr = true, silent = true })
-
-    -- Auto-trigger completion when "/" is typed:
-    --   1. At start of line or after whitespace -> slash command completion
-    --      (uses <C-x><C-o> omnifunc — separate from @ completion system)
-    --   2. Within an @ path -> insert "/" and let TextChanged show popup
-    vim.keymap.set("i", "/", function()
-      local line = vim.api.nvim_get_current_line()
-      local col = vim.fn.col(".")
-      local before = line:sub(1, col - 1)
-      -- Slash command trigger (separate system, uses omnifunc)
-      if before == "" or before:match("%s$") then
-        return "/<C-x><C-o>"
-      end
-      -- @ file path handling
-      local action = file_completion.handle_slash_key(line, col)
-      if action == "trigger" then
-        controller.activate()
-        vim.schedule(function() controller.show() end)
-        return ""
-      end
-      if action == "insert_and_trigger" then
-        controller.activate()
-        return "/"
-      end
-      return "/"
-    end, { buffer = bufnr, expr = true, silent = true })
+    require("aibo.completion.prompt_ftplugin").setup_triggers(bufnr)
   end
 
   local opts = { buffer = bufnr, nowait = true, silent = true }
