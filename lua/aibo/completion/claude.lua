@@ -1,372 +1,201 @@
 --- Completion module for Claude Code in aibo prompt
 --- Provides omnifunc-compatible completion for "/" slash commands and "@" file paths
+---
+--- Live "/" completion is sourced by probing `claude` directly (see the
+--- "Live probe" section below), not via the Agent Client Protocol (ACP):
+--- Claude Code does not speak ACP itself — that needs a separate adapter
+--- (`claude-agent-acp`, wrapping the Claude Agent SDK). Since aibo already
+--- hard-depends on the `claude` binary (it drives the interactive session
+--- over a PTY), this module talks `claude`'s own internal stream-json
+--- control protocol directly instead, so live completion needs no adapter,
+--- no Node.js, and no npm. See :help aibo-claude-probe for the design.
 local M = {}
 
-local file_completion = require("aibo.completion.file")
+local probe = require("aibo.completion.probe")
+local cache = require("aibo.completion.cwd_cache").new()
 
--- Claude Code built-in slash commands and bundled skills
--- Reference: https://code.claude.com/docs/en/commands
-local BUILTIN_COMMANDS = {
-  { cmd = "/add-dir", description = "Add a working directory for file access" },
-  { cmd = "/advisor", description = "Let Claude consult a stronger model at key moments" },
-  { cmd = "/agents", description = "Manage agent configurations" },
-  { cmd = "/allowed-tools", description = "Manage tool permission rules (alias for /permissions)" },
-  { cmd = "/android", description = "Show QR code to download the Claude mobile app (alias for /mobile)" },
-  { cmd = "/app", description = "Continue the current session in the Claude Code Desktop app (alias for /desktop)" },
-  { cmd = "/autocompact", description = "Set how full the context gets before auto-summarizing" },
-  { cmd = "/autofix-pr", description = "Spawn a web session that watches the PR and pushes fixes for CI failures" },
-  { cmd = "/background", description = "Send this session to the background and free the terminal" },
-  { cmd = "/bashes", description = "List and manage background tasks (alias for /tasks)" },
-  { cmd = "/batch", description = "Orchestrate large-scale changes across a codebase in parallel (skill)" },
-  { cmd = "/bg", description = "Send this session to the background and free the terminal (alias for /background)" },
-  { cmd = "/branch", description = "Create a branch of the current conversation at this point" },
-  {
-    cmd = "/break-reminder",
-    description = "Configure optional break reminders and quiet-hours nudges (alias for /wellbeing)",
-  },
-  { cmd = "/breaks", description = "Configure optional break reminders and quiet-hours nudges (alias for /wellbeing)" },
-  { cmd = "/btw", description = "Ask a quick side question without adding to the conversation" },
-  { cmd = "/bug", description = "Submit feedback about Claude Code (alias for /feedback)" },
-  { cmd = "/cd", description = "Move this session to a new working directory" },
-  { cmd = "/checkpoint", description = "Rewind the conversation and/or code to a previous point (alias for /rewind)" },
-  { cmd = "/chrome", description = "Configure Claude in Chrome settings" },
-  { cmd = "/claude-api", description = "Load Claude API reference material for your project's language (skill)" },
-  { cmd = "/clear", description = "Start a new conversation with empty context" },
-  { cmd = "/code-review", description = "Review the current diff for correctness bugs and quality cleanups (skill)" },
-  { cmd = "/color", description = "Set the prompt bar color for the current session" },
-  { cmd = "/compact", description = "Free up context by summarizing the conversation so far" },
-  { cmd = "/config", description = "Open the Settings interface" },
-  { cmd = "/context", description = "Visualize current context usage as a colored grid" },
-  { cmd = "/continue", description = "Resume a conversation by ID or name (alias for /resume)" },
-  { cmd = "/copy", description = "Copy the last assistant response to clipboard" },
-  { cmd = "/cost", description = "Show plan usage limits and activity stats (alias for /usage)" },
-  { cmd = "/daemon", description = "Manage background services and routines" },
-  { cmd = "/debug", description = "Enable debug logging and troubleshoot session issues (skill)" },
-  { cmd = "/deep-research", description = "Fan out web searches and synthesize a cited research report (skill)" },
-  {
-    cmd = "/design-login",
-    description = "Authorize design-system access for /design-sync with your claude.ai account",
-  },
-  { cmd = "/design-sync", description = "Push a React design system to claude.ai/design" },
-  { cmd = "/desktop", description = "Continue the current session in the Claude Code Desktop app" },
-  { cmd = "/diff", description = "Open an interactive diff viewer for uncommitted and per-turn changes" },
-  { cmd = "/doctor", description = "Diagnose and verify your Claude Code installation and settings" },
-  {
-    cmd = "/downtime",
-    description = "Configure optional break reminders and quiet-hours nudges (alias for /wellbeing)",
-  },
-  { cmd = "/effort", description = "Set the model effort level" },
-  { cmd = "/exit", description = "Exit the CLI" },
-  { cmd = "/export", description = "Export the current conversation as plain text" },
-  { cmd = "/extra-usage", description = "Renamed to /usage-credits" },
-  { cmd = "/fast", description = "Toggle fast mode on or off" },
-  { cmd = "/feedback", description = "Submit feedback about Claude Code" },
-  {
-    cmd = "/fewer-permission-prompts",
-    description = "Add an allowlist for common read-only tools to project settings (skill)",
-  },
-  { cmd = "/focus", description = "Toggle the focus view (last prompt, tool summary, final response)" },
-  { cmd = "/fork", description = "Spawn a background agent that inherits the full conversation" },
-  { cmd = "/goal", description = "Set a goal Claude checks before stopping" },
-  { cmd = "/heapdump", description = "Write a JS heap snapshot and memory breakdown for diagnosing memory usage" },
-  { cmd = "/help", description = "Show help and available commands" },
-  { cmd = "/hooks", description = "View hook configurations for tool events" },
-  { cmd = "/ide", description = "Manage IDE integrations and show status" },
-  { cmd = "/init", description = "Initialize project with a CLAUDE.md guide" },
-  { cmd = "/init-verifiers", description = "Create verifier skill(s) for automated verification of code changes" },
-  { cmd = "/insights", description = "Generate a report analyzing your Claude Code sessions" },
-  { cmd = "/install", description = "Install Claude Code native build" },
-  { cmd = "/install-github-app", description = "Set up the Claude GitHub Actions app for a repository" },
-  { cmd = "/install-slack-app", description = "Install the Claude Slack app via OAuth" },
-  { cmd = "/ios", description = "Show QR code to download the Claude mobile app (alias for /mobile)" },
-  { cmd = "/keybindings", description = "Open or create your keybindings configuration file" },
-  { cmd = "/login", description = "Sign in to your Anthropic account" },
-  { cmd = "/logout", description = "Sign out from your Anthropic account" },
-  { cmd = "/loop", description = "Run a prompt repeatedly while the session stays open (skill)" },
-  { cmd = "/marketplace", description = "Manage Claude Code plugins (alias for /plugin)" },
-  { cmd = "/mcp", description = "Manage MCP server connections and OAuth authentication" },
-  { cmd = "/memory", description = "Edit CLAUDE.md memory files and manage auto-memory entries" },
-  { cmd = "/mobile", description = "Show QR code to download the Claude mobile app" },
-  { cmd = "/model", description = "Select or change the AI model" },
-  { cmd = "/name", description = "Rename the current session and show the name on the prompt bar (alias for /rename)" },
-  { cmd = "/new", description = "Start a new conversation with empty context (alias for /clear)" },
-  { cmd = "/passes", description = "Share a free week of Claude Code with friends" },
-  { cmd = "/permissions", description = "Manage allow, ask, and deny rules for tool permissions" },
-  { cmd = "/plan", description = "Enter plan mode directly from the prompt" },
-  { cmd = "/plugin", description = "Manage Claude Code plugins" },
-  { cmd = "/plugins", description = "Manage Claude Code plugins (alias for /plugin)" },
-  { cmd = "/powerup", description = "Discover Claude Code features through interactive lessons" },
-  { cmd = "/privacy-settings", description = "View and update your privacy settings (Pro and Max only)" },
-  { cmd = "/proactive", description = "Run a prompt repeatedly while the session stays open (alias for /loop)" },
-  { cmd = "/quit", description = "Exit the CLI (alias for /exit)" },
-  { cmd = "/radio", description = "Open Claude FM lo-fi radio in your browser" },
-  { cmd = "/rc", description = "Make this session available for remote control (alias for /remote-control)" },
-  { cmd = "/recap", description = "Generate a one-line summary of the current session" },
-  { cmd = "/release-notes", description = "View the changelog in an interactive version picker" },
-  { cmd = "/reload-plugins", description = "Reload all active plugins to apply pending changes without restarting" },
-  { cmd = "/reload-skills", description = "Pick up skills added or changed on disk during this session" },
-  { cmd = "/remote-control", description = "Make this session available for remote control from claude.ai" },
-  { cmd = "/remote-env", description = "Configure the default remote environment for web sessions" },
-  { cmd = "/rename", description = "Rename the current session and show the name on the prompt bar" },
-  { cmd = "/reset", description = "Start a new conversation with empty context (alias for /clear)" },
-  { cmd = "/resume", description = "Resume a conversation by ID or name, or open the session picker" },
-  { cmd = "/review", description = "Review a pull request locally in your current session" },
-  { cmd = "/rewind", description = "Rewind the conversation and/or code to a previous point" },
-  { cmd = "/routines", description = "Create, update, list, or run routines (alias for /schedule)" },
-  { cmd = "/run", description = "Launch and drive your project's app to verify a change live (skill)" },
-  {
-    cmd = "/run-skill-generator",
-    description = "Generate a per-project skill teaching /run and /verify to launch your app (skill)",
-  },
-  { cmd = "/sandbox", description = "Toggle sandbox mode" },
-  { cmd = "/schedule", description = "Create, update, list, or run routines" },
-  { cmd = "/scroll-speed", description = "Adjust mouse wheel scroll speed (fullscreen rendering only)" },
-  {
-    cmd = "/security-review",
-    description = "Analyze pending changes on the current branch for security vulnerabilities",
-  },
-  { cmd = "/settings", description = "Open the Settings interface (alias for /config)" },
-  { cmd = "/setup-bedrock", description = "Configure Amazon Bedrock authentication, region, and model pins" },
-  { cmd = "/setup-vertex", description = "Configure Google Vertex AI authentication, project, and region" },
-  { cmd = "/share", description = "Submit feedback about Claude Code (alias for /feedback)" },
-  { cmd = "/simplify", description = "Review recently changed files for reuse, quality, and efficiency (skill)" },
-  { cmd = "/skills", description = "List available skills" },
-  { cmd = "/stats", description = "Show plan usage limits and activity stats (alias for /usage)" },
-  { cmd = "/status", description = "Open the Settings interface (Status tab)" },
-  { cmd = "/statusline", description = "Configure Claude Code's status line" },
-  { cmd = "/stickers", description = "Order Claude Code stickers" },
-  { cmd = "/stop", description = "Stop this background session; transcript and worktree are kept" },
-  { cmd = "/tasks", description = "List and manage background tasks" },
-  { cmd = "/team-onboarding", description = "Generate a team onboarding guide from your Claude Code usage history" },
-  { cmd = "/teleport", description = "Pull a Claude Code on the web session into this terminal" },
-  { cmd = "/terminal-setup", description = "Configure terminal keybindings for Shift+Enter and other shortcuts" },
-  { cmd = "/theme", description = "Change the color theme" },
-  { cmd = "/toggle-memory", description = "Toggle automemory off/on for this session" },
-  { cmd = "/tp", description = "Pull a Claude Code on the web session into this terminal (alias for /teleport)" },
-  { cmd = "/tui", description = "Set the terminal UI renderer (default or fullscreen)" },
-  {
-    cmd = "/ultraplan",
-    description = "Draft a plan in an ultraplan session, review it, then execute remotely or locally",
-  },
-  { cmd = "/ultrareview", description = "Run a deep, multi-agent code review in a cloud sandbox" },
-  { cmd = "/undo", description = "Rewind the conversation and/or code to a previous point (alias for /rewind)" },
-  { cmd = "/upgrade", description = "Open the upgrade page to switch to a higher plan tier" },
-  { cmd = "/usage", description = "Show session cost, plan usage limits, and activity stats" },
-  { cmd = "/usage-credits", description = "Configure usage credits to keep working when you hit a limit" },
-  { cmd = "/verify", description = "Verify a code change by building and running your project's app (skill)" },
-  { cmd = "/voice", description = "Toggle voice dictation, or enable it in a specific mode" },
-  {
-    cmd = "/web-setup",
-    description = "Connect your GitHub account to Claude Code on the web using your gh CLI credentials",
-  },
-  { cmd = "/wellbeing", description = "Configure optional break reminders and quiet-hours nudges" },
-  { cmd = "/workflows", description = "Browse running and completed workflows" },
+-- ============================================================================
+-- Live probe: talk to `claude` directly (control_request/control_response)
+-- ============================================================================
+--
+-- Protocol (reverse-engineered from `@anthropic-ai/claude-agent-sdk`'s
+-- `sdk.mjs`, which `claude-agent-acp` itself uses to drive `claude`):
+--   spawn: claude --output-format stream-json --verbose \
+--                 --input-format stream-json --no-session-persistence
+--     -> write one line: {"request_id":.., "type":"control_request",
+--                          "request":{"subtype":"initialize"}}
+--     -> read one line back: {"type":"control_response",
+--          "response":{"subtype":"success","request_id":..,
+--                       "response":{"commands":[...]}}}
+--     -> terminate
+--
+-- This is a control-plane request/response, not a prompt turn — no `user`
+-- message is ever sent, so no inference runs and no tokens are consumed.
+-- `--no-session-persistence` additionally leaves no session-history file
+-- under `~/.claude/projects`.
+--
+-- Caveat: unlike ACP, this wire format is undocumented and internal to the
+-- Claude Agent SDK — it has no version guarantee and can change on any
+-- `claude` release without notice. Failures are treated as routine (timeout,
+-- parse error, exit) and no commands are offered.
+
+-- Talk to the `claude` binary directly (already a hard dependency of aibo).
+-- There is no separate adapter to resolve or install.
+local DEFAULT_PROBE_CMD = { "claude" }
+
+-- Extra CLI flags that put `claude` into the stream-json control-protocol
+-- mode this module speaks, without persisting a session-history entry.
+local PROBE_ARGS = {
+  "--output-format",
+  "stream-json",
+  "--verbose",
+  "--input-format",
+  "stream-json",
+  "--no-session-persistence",
 }
 
----Extract description from command file
----@param file string Path to the command file
----@return string Description
-local function extract_description(file)
-  local lines = vim.fn.readfile(file, "", 20) -- Read up to 20 lines for front matter
-  local description = nil
+local PROBE_REQUEST_ID = "aibo-probe"
 
-  -- Check for YAML front matter
-  if lines[1] == "---" then
-    for i = 2, #lines do
-      if lines[i] == "---" then
-        break
-      end
-      -- Look for description field in YAML
-      local desc = lines[i]:match("^description:%s*(.+)$")
-      if desc then
-        description = vim.trim(desc)
-        break
-      end
-    end
-  else
-    -- No front matter, try first line as description
-    local first_line = lines[1] or ""
-    first_line = first_line:gsub("^<!%-%-", ""):gsub("%-%->$", ""):gsub("^#+ *", "")
-    first_line = vim.trim(first_line)
-    if first_line ~= "" and first_line ~= "---" then
-      description = first_line
-    end
-  end
-
-  return description or "Custom command"
-end
-
----Find custom slash commands from .claude/commands directories
----@return table[] List of custom command definitions
-local function find_custom_commands()
-  local commands = {}
-  local seen = {}
-
-  -- Search locations for custom commands (personal takes precedence over project)
-  local search_paths = {
-    vim.fn.expand("~/.claude/commands"), -- User personal commands
-    vim.fn.getcwd() .. "/.claude/commands", -- Project commands
-  }
-
-  for _, dir in ipairs(search_paths) do
-    if vim.fn.isdirectory(dir) == 1 then
-      -- Find .md files in root and subdirectories (namespace:command format)
-      local files = vim.fn.glob(dir .. "/**/*.md", false, true)
-      for _, file in ipairs(files) do
-        -- Get relative path from commands dir
-        local rel_path = file:sub(#dir + 2) -- +2 for trailing slash
-        local name_with_ext = rel_path:gsub("/", ":") -- Convert path separators to colons
-        local name = name_with_ext:gsub("%.md$", "") -- Remove .md extension
-
-        if not seen[name] then
-          seen[name] = true
-          local description = extract_description(file)
-          table.insert(commands, {
-            cmd = "/" .. name,
-            description = description .. " (custom)",
-          })
-        end
-      end
-    end
-  end
-
-  return commands
-end
-
----Find custom skills from .claude/skills directories
----Skills use the structure: .claude/skills/<skill-name>/SKILL.md
----@return table[] List of custom skill definitions
-local function find_custom_skills()
-  local skills = {}
-  local seen = {}
-
-  -- Personal takes precedence over project
-  local search_paths = {
-    vim.fn.expand("~/.claude/skills"), -- User personal skills
-    vim.fn.getcwd() .. "/.claude/skills", -- Project skills
-  }
-
-  for _, dir in ipairs(search_paths) do
-    if vim.fn.isdirectory(dir) == 1 then
-      local files = vim.fn.glob(dir .. "/*/SKILL.md", false, true)
-      for _, file in ipairs(files) do
-        -- Extract skill name from parent directory
-        local name = vim.fn.fnamemodify(file, ":h:t")
-
-        if not seen[name] then
-          seen[name] = true
-          local description = extract_description(file)
-          table.insert(skills, {
-            cmd = "/" .. name,
-            description = description .. " (skill)",
-          })
-        end
-      end
-    end
-  end
-
-  return skills
-end
-
----Get all slash commands (built-in + custom + skills)
----@return table[] List of all command definitions
-local function get_all_commands()
-  local commands = vim.deepcopy(BUILTIN_COMMANDS)
-  local custom = find_custom_commands()
-  for _, cmd in ipairs(custom) do
-    table.insert(commands, cmd)
-  end
-  local skills = find_custom_skills()
-  for _, cmd in ipairs(skills) do
-    table.insert(commands, cmd)
-  end
-  return commands
-end
-
----Get completions for slash commands
----@param base string The text to complete (should start with "/")
----@return table[] List of completion items
-local function get_slash_completions(base)
-  local completions = {}
-  local prefix = base:lower()
-  local all_commands = get_all_commands()
-
-  for _, item in ipairs(all_commands) do
-    if item.cmd:lower():find(prefix, 1, true) == 1 then
-      table.insert(completions, {
-        word = item.cmd,
-        menu = item.description,
-        kind = "Slash",
+---Convert `claude`'s control_response `commands` array into aibo completion
+---entries. Pure function — the unit-testable core of the probe.
+---@param available table[]|nil Command objects ({ name, description, argumentHint?, aliases? })
+---@return table[] entries List of { cmd = "/name", description = string }
+function M._parse_available_commands(available)
+  local entries = {}
+  for _, c in ipairs(available or {}) do
+    -- Defensive: `claude` may include malformed items; skip anything that is
+    -- not a table with a non-empty string `name`.
+    if type(c) == "table" and type(c.name) == "string" and c.name ~= "" then
+      table.insert(entries, {
+        cmd = "/" .. c.name,
+        description = type(c.description) == "string" and c.description or "",
       })
     end
   end
-
-  return completions
+  return entries
 end
 
----Check if the cursor is at a position where slash command completion should trigger
----@param line string Current line content
----@param col number Cursor column (1-indexed)
----@return number|nil Start column of the slash command, or nil if not applicable
-local function find_slash_start(line, col)
-  local before_cursor = line:sub(1, col - 1)
+---Get the cached probe entries for a directory, if any.
+---@param cwd string|nil Defaults to the current working directory
+---@return table[]|nil entries Cached entries, or nil on cache miss
+function M.get_cached(cwd)
+  return cache.get(cwd)
+end
 
-  -- Find "/" at start of line or after whitespace
-  local slash_pos = nil
-  for i = #before_cursor, 1, -1 do
-    local char = before_cursor:sub(i, i)
-    if char == "/" then
-      if i == 1 or before_cursor:sub(i - 1, i - 1):match("%s") then
-        slash_pos = i
-        break
+---Clear the probe cache.
+---@param cwd string|nil If given, clear only that directory; otherwise clear all
+function M.clear_cache(cwd)
+  cache.clear(cwd)
+end
+
+---Resolve the command to actually run: the configured `cmd` if it is
+---executable, else the default `claude` binary.
+---@param opts table|nil { cmd? }
+---@return string[]|nil cmd Runnable command, or nil if not executable
+function M.resolve_cmd(opts)
+  opts = opts or {}
+  local cmd = opts.cmd or DEFAULT_PROBE_CMD
+  if vim.fn.executable(cmd[1]) == 1 then
+    return cmd
+  end
+  return nil
+end
+
+---Check whether `claude` (or a configured override) is resolvable.
+---@param opts table|nil { cmd? }
+---@return boolean
+function M.is_available(opts)
+  return M.resolve_cmd(opts) ~= nil
+end
+
+---Asynchronously probe `claude` for its live command list and cache the
+---result. Sends only a control-plane `initialize` request — never a prompt —
+---so no tokens are consumed.
+---@param opts table|nil { cwd?, cmd?, timeout? (ms) }
+---@param callback fun(entries: table[]|nil, err: string|nil)|nil
+local function refresh_probe(opts, callback)
+  opts = opts or {}
+  callback = callback or function() end
+  local cwd = opts.cwd or vim.fn.getcwd()
+  local cmd = M.resolve_cmd(opts)
+
+  if not cmd then
+    vim.schedule(function()
+      callback(nil, "claude not found: " .. tostring((opts.cmd or DEFAULT_PROBE_CMD)[1]))
+    end)
+    return
+  end
+
+  local full_cmd = vim.deepcopy(cmd)
+  for _, a in ipairs(PROBE_ARGS) do
+    table.insert(full_cmd, a)
+  end
+
+  probe.run(full_cmd, { cwd = cwd, timeout = opts.timeout, label = "claude" }, {
+    on_start = function(send)
+      send({
+        request_id = PROBE_REQUEST_ID,
+        type = "control_request",
+        request = { subtype = "initialize" },
+      })
+    end,
+    on_message = function(msg, _send, finish)
+      if type(msg) ~= "table" or msg.type ~= "control_response" then
+        return
       end
-    elseif char:match("%s") then
-      break
+      local response = msg.response
+      if type(response) ~= "table" or response.request_id ~= PROBE_REQUEST_ID then
+        return
+      end
+      if response.subtype == "error" then
+        finish(nil, ("initialize failed: %s"):format(vim.inspect(response.error)))
+        return
+      end
+      if response.subtype == "success" then
+        finish(M._parse_available_commands((response.response or {}).commands))
+      end
+    end,
+  }, function(entries, err)
+    if entries then
+      cache.set(cwd, entries)
     end
-  end
-
-  return slash_pos
+    callback(entries, err)
+  end)
 end
 
----Omnifunc for integrated completion (slash commands + file paths)
----@param findstart number 1 to find start position, 0 to get completions
----@param base string The text to complete (only used when findstart is 0)
----@return number|table Start position or completion list
-function M.omnifunc(findstart, base)
-  if findstart == 1 then
-    local line = vim.api.nvim_get_current_line()
-    local col = vim.fn.col(".")
-
-    -- Check @ file completion first (since @/ contains "/" which could match slash)
-    local at_start = file_completion.find_at_start(line, col)
-    if at_start then
-      return at_start - 1 -- Convert to 0-indexed
-    end
-
-    -- Then check / slash command completion
-    local slash_start = find_slash_start(line, col)
-    if slash_start then
-      return slash_start - 1 -- Convert to 0-indexed
-    end
-
-    return -3
-  else
-    -- Route to appropriate completion based on trigger character
-    if base:sub(1, 1) == "@" then
-      return file_completion.get_completions(base)
-    end
-
-    if base:sub(1, 1) ~= "/" then
-      base = "/" .. base
-    end
-    return get_slash_completions(base)
-  end
+---Get all slash commands from the live probe cache. `claude`'s own command
+---list already includes the account's custom commands/skills (tagged e.g.
+---"(user)" by `claude` itself), so there is no separate disk scan here --
+---unlike a static table, the live probe can't drift out of sync with what's
+---actually on disk. With the probe disabled/unavailable, no commands are
+---offered (enable `tools.claude.completion.claude`; see :help aibo-claude-probe).
+---@return table[] List of all command definitions
+local function get_all_commands()
+  return vim.deepcopy(M.get_cached() or {})
 end
+
+M.omnifunc = require("aibo.completion.omnifunc").make(get_all_commands)
 
 ---Get raw list of slash commands (for external use)
 ---@return table[] List of slash command definitions
 function M.get_commands()
   return get_all_commands()
+end
+
+---Warm the live-probed command cache for the current directory (async).
+---Fire-and-forget: completion offers nothing until the cache is populated.
+---No prompt is ever sent, so this consumes no tokens. No-op-ish when
+---`claude` is unavailable (the callback receives an error).
+---@param opts table|nil { cwd?, cmd?, timeout? }
+---@param callback fun(entries: table[]|nil, err: string|nil)|nil
+function M.refresh_acp(opts, callback)
+  opts = opts or {}
+  callback = callback or function() end
+  if not M.is_available(opts) then
+    callback(nil, "claude not found: " .. tostring((opts.cmd or DEFAULT_PROBE_CMD)[1]))
+    return
+  end
+  refresh_probe(opts, callback)
 end
 
 return M
