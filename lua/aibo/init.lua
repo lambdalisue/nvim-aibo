@@ -1,13 +1,23 @@
 local M = {}
 
+---@class AiboProbeConfig
+---@field cmd? string[] Command to probe, looked up on PATH (default varies per source; see completion/*.lua)
+---@field timeout? integer Probe timeout in ms (default: 10000)
+
+---@class AiboCompletionConfig
+---@field claude? AiboProbeConfig|boolean Source "/" completion from a live probe of `claude`'s own command list (Claude does not speak ACP itself). See completion/claude.lua. Enabled by default on the `claude` tool (there is no static fallback).
+---@field codex? AiboProbeConfig|boolean Source "/" completion from a live probe of `codex`'s own skill list (Codex does not speak ACP itself). See completion/codex.lua. Enabled by default on the `codex` tool (there is no static fallback).
+---@field acp? AiboProbeConfig|boolean Source "/" completion from a live probe over the real Agent Client Protocol (ACP), for agents that speak it natively. Currently wired up for Gemini CLI (`gemini --acp`). See completion/acp.lua and completion/gemini.lua. Enabled by default on the `gemini` tool (there is no static fallback).
+
 ---@class AiboBufferConfig
 ---@field on_attach? fun(bufnr: integer, info: table) Callback for buffer attachment
 ---@field no_default_mappings? boolean Disable default key mappings
+---@field completion? AiboCompletionConfig Live "/" completion source(s) for this tool, keyed by completion module name (claude/codex/acp). Only meaningful under `tools.<name>` -- see completion/prompt_ftplugin.lua for which module each built-in tool ftplugin wires up.
 
 ---@class AiboConfig
 ---@field prompt? AiboBufferConfig Configuration for prompt buffers
 ---@field console? AiboBufferConfig Configuration for console buffers
----@field tools? table<string, AiboBufferConfig> Tool-specific configurations
+---@field tools? table<string, AiboBufferConfig> Tool-specific configurations, keyed by the tool name aibo dispatches on (the first word of the invoked command, e.g. "claude", "codex", "gemini")
 ---@field submit_key? string Key to submit input (default: "<CR>")
 ---@field submit_delay? integer Delay before submit in ms (default: 500)
 ---@field prompt_height? integer Height of prompt window (default: 10)
@@ -29,8 +39,25 @@ local DEFAULTS = {
     on_attach = nil,
     no_default_mappings = false,
   },
-  -- Tool-specific configurations can be added here
-  tools = {},
+  -- Tool-specific configurations, keyed by the tool name aibo dispatches on
+  -- (the first word of the invoked command). `completion` here selects which
+  -- completion module backs that tool's "/" completion -- see
+  -- AiboCompletionConfig and completion/prompt_ftplugin.lua. All on by
+  -- default: none of claude/codex/acp has a static fallback, so disabling
+  -- one leaves no "/" completion at all for that tool.
+  tools = {
+    claude = {
+      completion = { claude = true }, -- direct probe of `claude` (does not speak ACP itself)
+    },
+    codex = {
+      completion = { codex = true }, -- direct probe of `codex` (does not speak ACP itself)
+    },
+    gemini = {
+      -- Generic ACP client (completion/acp.lua): Gemini CLI speaks ACP
+      -- natively (`gemini --acp`).
+      completion = { acp = true },
+    },
+  },
   submit_key = "<CR>",
   submit_delay = 500,
   prompt_height = 10,
@@ -105,6 +132,25 @@ function M.get_tool_config(tool)
     return vim.deepcopy(config.tools[tool])
   end
   return {}
+end
+
+---Get a tool's configuration for a specific completion source. Completion
+---config lives under `tools.<tool>.completion.<source>` -- e.g. the `claude`
+---tool's own `claude` probe is `tools.claude.completion.claude`, and the
+---`gemini` tool's generic ACP client is `tools.gemini.completion.acp`.
+---@param tool string Tool name (e.g., "claude", "codex", "gemini")
+---@param source string Completion module name (e.g., "claude", "codex", "acp")
+---@return AiboProbeConfig|boolean Configuration for the source (false when disabled/unset)
+function M.get_completion_config(tool, source)
+  local tool_completion = tool and config.tools and config.tools[tool] and config.tools[tool].completion
+  if tool_completion and tool_completion[source] ~= nil then
+    local value = tool_completion[source]
+    if type(value) == "table" then
+      return vim.deepcopy(value)
+    end
+    return value
+  end
+  return false
 end
 
 ---Send data to the terminal
