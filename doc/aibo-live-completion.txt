@@ -1,0 +1,220 @@
+*aibo-live-completion.txt*	Live "/" completion design overview for Aibo
+
+Author:  lambdalisue <lambdalisue@gmail.com>
+License: MIT license
+
+=============================================================================
+CONTENTS					*aibo-live-completion-contents*
+
+INTRODUCTION				|aibo-live-completion-introduction|
+COMPLETION MODULES			|aibo-live-completion-modules|
+BILLING SAFETY				|aibo-live-completion-billing|
+PROCESS MANAGEMENT			|aibo-live-completion-process|
+CONFIGURATION				|aibo-live-completion-config|
+
+=============================================================================
+INTRODUCTION					*aibo-live-completion-introduction*
+
+This document describes the design behind the live "/" completion feature:
+probing each AI agent for its own live slash-command / skill list, as a
+read-only side-channel purely for completion candidates. The interactive
+session itself keeps running over a PTY exactly as before this feature
+existed. Status: implemented; on by default for all three sources (see
+|aibo-live-completion-config|).
+
+For the Claude- and Codex-specific probe protocols, see |aibo-claude.txt|
+and |aibo-codex.txt|. For the real Agent Client Protocol (ACP) and Gemini's
+use of it, see |aibo-acp.txt|.
+
+Motivation~
+
+Slash-command / skill completion in the aibo prompt used to be fed by
+static sources per tool -- for Claude, a `BUILTIN_COMMANDS` table
+(~150 entries, hand-synced against the Claude Code docs/binary) plus a
+disk scan of `~/.claude/commands` and `~/.claude/skills`. Both have since
+been removed in favor of the live probe (|aibo-claude.txt|); Codex's disk
+scan of `.codex/skills` was removed the same way (|aibo-codex.txt|). They
+existed because of these pain points, which the live probe solves directly:
+
+- A hardcoded table drifts with every release; keeping it synced is
+  ongoing manual toil.
+- Plugin-provided, MCP-provided, and dynamically-enabled commands/skills
+  are invisible to a disk scan -- only fixed on-disk locations are
+  scanned, and each agent's own live command list already includes all of
+  these (see the per-agent verification notes in the linked docs).
+- Session-state-dependent availability (login state, permission mode,
+  enabled plugins) can't be reflected by anything static.
+
+Goal & non-goals~
+
+Goal: obtain the live, session-accurate command/skill list straight from
+each agent, without changing the PTY execution model and without adding an
+external dependency.
+
+Non-goals: running prompts, replacing the terminal UI, or requiring
+anything beyond the agent binary aibo already depends on for that tool.
+
+=============================================================================
+COMPLETION MODULES				*aibo-live-completion-modules*
+
+Live completion is split across three modules under `lua/aibo/completion/`,
+because the agents involved don't all speak the same protocol:
+>
+	claude.lua  Claude              claude's own internal stream-json
+	                                control protocol (inlined). Not ACP.
+	                                See |aibo-claude.txt|.
+
+	codex.lua   Codex               codex app-server's own JSON-RPC
+	                                protocol (inlined). Not ACP.
+	                                See |aibo-codex.txt|.
+
+	acp.lua     Gemini (via         The real, documented Agent Client
+	            `gemini --acp`)     Protocol. See |aibo-acp.txt|.
+<
+Why Claude and Codex don't use acp.lua~
+
+Neither `claude` nor `codex` speaks the Agent Client Protocol (ACP) itself.
+ACP support for them only exists via separate community/vendor adapters
+(`claude-agent-acp`, `codex-acp`) that wrap each agent's SDK/runtime and
+translate to ACP -- real external dependencies (Node.js, npm, a package to
+keep updated) for a feature that only needs a list of strings. Since aibo
+already hard-depends on the `claude`/`codex` binaries themselves (they
+drive the interactive session over a PTY), each of `claude.lua`/`codex.lua`
+talks that binary's own internal control protocol directly instead, so
+live completion needs no adapter.
+
+`acp.lua` stays a generic, agent-agnostic ACP client (`cmd` has no default
+-- callers must supply the agent to probe) so it's ready to reuse for any
+other agent that speaks ACP natively, without modification. See
+|aibo-acp.txt| for details.
+
+Shared plumbing~
+
+All three modules build on the same small set of shared helpers, to avoid
+duplicating the same subprocess/completion logic three times:
+
+- `completion/probe.lua` -- spawns a short-lived child process, splits
+  stdout into newline-delimited JSON messages, and resolves to a result or
+  error with a timeout. Each module supplies only its own protocol-specific
+  request/response handling.
+- `completion/cwd_cache.lua` -- a tiny per-cwd result cache; each module
+  keeps its own independent instance.
+- `completion/omnifunc.lua` -- builds the omnifunc (cursor-position
+  detection, prefix filtering, "/" vs "@" routing) from a `get_commands()`
+  function each module supplies.
+- `completion/prompt_ftplugin.lua` -- used by `ftplugin/aibo-tool-*.lua` to
+  wire the omnifunc, warm the probe cache, and set up the "/" and "@"
+  auto-trigger keymaps for a prompt buffer.
+
+=============================================================================
+BILLING SAFETY					*aibo-live-completion-billing*
+
+Anthropic announced (then paused on 2026-06-16) a split that would move
+third-party agent / Agent SDK / ACP / `claude -p` usage off the Pro/Max
+subscription pool into a separate metered "Agent SDK credit". First-party
+usage (the official `claude`/`codex` CLIs) stays on the subscription. The
+change is currently not in effect, but the intent is clear and may be
+reinstated with notice.
+
+This design sidesteps that risk on two independent grounds, for every
+module:
+
+1. The real work stays first-party. The interactive session is the actual
+   agent CLI over a PTY -- it remains on the subscription pool regardless
+   of what happens to ACP/SDK metering.
+2. The probe consumes zero model tokens. Every module sends only
+   control-plane requests -- never a prompt turn (`session/prompt` for ACP,
+   Claude's `control_request{subtype:"initialize"}`, or Codex's
+   `initialize`/`skills/list` -- critically, never `thread/start`). No
+   inference runs. Even if the Agent SDK credit split is reinstated,
+   enumerating commands has nothing to meter.
+
+   Caveat: "zero tokens" is not the same as "offline". Each probe still has
+   to start a real, authenticated process and wait for it to initialize. It
+   needs working credentials and connectivity -- it just never spends
+   inference.
+
+Corollary: there is no reason to avoid logging in for any of these probes.
+Auth only determines whether the process can initialize; it does not add
+cost for a metadata-only exchange.
+
+=============================================================================
+PROCESS MANAGEMENT				*aibo-live-completion-process*
+
+One-shot + cache: spawn, grab the response, kill the process; cache in
+memory, keyed by cwd. Never spawn per-keystroke; completion always reads
+the cache. A short-lived listener (to catch later changes, e.g. MCP servers
+connecting after startup) was considered for all three modules but is not
+implemented -- the current design intentionally trades that fidelity for
+simplicity, since this whole feature is best-effort completion, not a
+source of truth.
+
+The omnifunc for each tool is synchronous, so every probe runs
+asynchronously (`vim.system`) and the omnifunc always serves the last
+cached list, with no TTL -- a stale list is still strictly more accurate
+than a static table, and each ftplugin only probes once per cwd per
+session.
+
+=============================================================================
+CONFIGURATION					*aibo-live-completion-config*
+
+Completion config lives under `tools.<tool>.completion.<source>` -- alongside
+each tool's other settings (`on_attach`, `no_default_mappings`) -- rather
+than as a separate global list, so a completion source can be configured (or
+overridden) per tool profile. `<tool>` is whatever name aibo dispatches on
+(the first word of the invoked command); `<source>` selects which
+completion module backs it -- normally matching the tool's own name
+(`claude`, `codex`), except Gemini, which uses the generic ACP client's key
+(`acp`) since `completion/acp.lua` has no config key of its own (see
+|aibo-live-completion-modules|). On by default for all three built-in
+tools -- none has a static or disk-scanned fallback, so turning one off just
+means no "/" completion at all for that tool:
+>
+	require("aibo").setup({
+	  tools = {
+	    claude = {
+	      -- Probes `claude` directly (does not speak ACP itself).
+	      completion = {
+	        claude = true, -- or: { cmd = { "claude" }, timeout = 10000 }
+	        -- claude = false, -- no "/" completion at all for Claude
+	      },
+	    },
+	    codex = {
+	      -- Probes `codex app-server` directly (does not speak ACP itself).
+	      completion = {
+	        codex = true, -- or: { cmd = { "codex" }, timeout = 10000 }
+	        -- codex = false, -- no "/" completion at all for Codex
+	      },
+	    },
+	    gemini = {
+	      -- Generic ACP client; Gemini CLI speaks ACP natively.
+	      completion = {
+	        acp = true, -- or: { cmd = { "gemini", "--acp" }, timeout = 10000 }
+	        -- acp = false, -- no "/" completion at all for Gemini
+	      },
+	    },
+	  },
+	})
+<
+A custom tool profile can opt into any completion module, not just the one
+matching its own name -- e.g. a wrapper that launches a claude-flavored
+model via `:Aibo my-wrapper ...` can reuse Claude's probe with
+`tools["my-wrapper"].completion.claude = true`. `aibo` dispatches purely on
+the invoked command's first word, though (see |aibo-usage|) -- there is no
+separate alias/profile-name mechanism, so `tools.<name>` only ever applies
+to invocations whose first word is literally `<name>`.
+
+Behavior:
+
+- Agent binary on PATH (already required by aibo to use that tool at all)
+  -> completion goes live for that tool.
+- Disabled -> no "/" completion at all for that tool (none of the three
+  modules have a static or disk-scanned fallback).
+- Probe unavailable (binary not on PATH, not logged in, probe
+  failed/timed out) -> same as disabled: no "/" completion until it
+  resolves.
+
+Run `:checkhealth aibo` to see whether each probe target resolves.
+
+==============================================================================
+vim:tw=78:ts=8:ft=help:norl:

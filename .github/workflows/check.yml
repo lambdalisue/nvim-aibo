@@ -18,12 +18,9 @@ jobs:
           tool: just
 
       - name: Setup Lua and LuaRocks
-        uses: leafo/gh-actions-lua@v10
-        with:
-          luaVersion: "5.1"
-
-      - name: Setup LuaRocks
-        uses: leafo/gh-actions-luarocks@v4
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.1 liblua5.1-0-dev luarocks
 
       - uses: JohnnyMorganz/stylua-action@v4
         with:
@@ -32,7 +29,7 @@ jobs:
           args: false
 
       - name: Install Luacheck
-        run: luarocks install luacheck
+        run: sudo luarocks install luacheck
 
       - run: just lint
 

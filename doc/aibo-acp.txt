@@ -1,0 +1,79 @@
+*aibo-acp.txt*	Agent Client Protocol (ACP) completion source for Aibo
+
+Author:  lambdalisue <lambdalisue@gmail.com>
+License: MIT license
+
+=============================================================================
+CONTENTS					*aibo-acp-contents*
+
+AGENT CLIENT PROTOCOL			|aibo-acp|
+GEMINI					|aibo-acp-gemini|
+OTHER ACP-NATIVE AGENTS			|aibo-acp-other-agents|
+
+For the overall live "/" completion design (motivation, billing safety,
+configuration), see |aibo-live-completion.txt|. For Claude's and Codex's own
+(non-ACP) probes, see |aibo-claude.txt| and |aibo-codex.txt|.
+
+=============================================================================
+AGENT CLIENT PROTOCOL				*aibo-acp*
+
+The Agent Client Protocol (ACP, https://agentclientprotocol.com) is a real,
+documented, versioned protocol for editor <-> agent communication. Unlike
+Claude's and Codex's own internal probes (|aibo-claude.txt|,
+|aibo-codex.txt|), `lua/aibo/completion/acp.lua` talks the actual spec:
+>
+	spawn agent (stdio), e.g. { "gemini", "--acp" }
+	  -> initialize                         # read agentCapabilities
+	  -> session/new { cwd, mcpServers }    # cwd MUST match the live session
+	  -> await available_commands_update    # session/update notification
+	  -> cache availableCommands
+	  -> terminate
+<
+It never sends `session/prompt`, so it performs no model inference and
+consumes no tokens (see |aibo-live-completion-billing|).
+
+`acp.lua` is a generic, agent-agnostic client: `cmd` has no default --
+callers must supply the ACP-native agent to probe. It has no user-facing
+config of its own -- `true`/`cmd` wouldn't mean anything without knowing
+which agent to default to. Activation is keyed by `tools.<tool>.completion.acp`
+(|aibo-live-completion-config|) -- currently `tools.gemini.completion.acp`,
+read by `completion/gemini.lua`.
+
+=============================================================================
+GEMINI						*aibo-acp-gemini*
+
+Gemini CLI speaks ACP natively (`gemini --acp`), so `completion/gemini.lua`
+just wires the generic client at `{ "gemini", "--acp" }` -- no adapter.
+
+Verification~
+
+Hand-verified against a real, logged-in `gemini --acp` process: the
+`initialize` handshake completed and `session/new` returned a well-formed
+ACP JSON-RPC error -- proving wire-level interop -- but the specific
+account used was blocked by Gemini's own account-tier restriction
+(individual Code Assist access deprecated), not by anything on the client
+side.
+
+=============================================================================
+OTHER ACP-NATIVE AGENTS				*aibo-acp-other-agents*
+
+As of this writing, GitHub Copilot CLI (`copilot --acp`), Cursor CLI
+(`cursor-agent acp`), and Cline CLI 2.0 (`cline --acp`) also speak ACP
+natively. None of these have PTY-driving or completion support in aibo
+yet, so `completion/acp.lua` isn't wired up for them -- but because it
+takes `cmd` with no built-in default, adding a `completion/<agent>.lua`
+analogous to `gemini.lua` (just a different `cmd`) is all that would be
+needed once such an agent gets its own aibo integration.
+
+Caveat: `acp.lua`'s cache is keyed only by cwd, not by agent. This is fine
+while Gemini is the only agent routed through it; if a second ACP-native
+agent is wired up for the same cwd at the same time, they would currently
+share -- and clobber -- each other's cached entries. Revisit if/when that
+happens.
+
+Codex and (legacy) Amazon Q Developer CLI do not speak ACP at all
+(natively or via adapter, respectively they use their own protocol or
+none); Aider and Continue have no ACP support either as of this writing.
+
+==============================================================================
+vim:tw=78:ts=8:ft=help:norl:

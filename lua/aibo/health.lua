@@ -93,6 +93,33 @@ function M.check()
     info("Supported agents: claude, codex, ollama")
   end
 
+  -- Check live "/" completion sources (each probes the agent directly, or
+  -- via ACP for agents that speak it natively; no separate adapter needed)
+  start("Live completion")
+
+  local completion_sources = {
+    { tool = "claude", source = "claude", module = "aibo.completion.claude" },
+    { tool = "codex", source = "codex", module = "aibo.completion.codex" },
+    { tool = "gemini", source = "acp", module = "aibo.completion.gemini" }, -- generic ACP client
+  }
+
+  for _, entry in ipairs(completion_sources) do
+    local probe_cfg = aibo.get_completion_config(entry.tool, entry.source)
+    if not probe_cfg then
+      info(string.format("%s: off (opt-in); no live completion", entry.tool))
+      info(string.format("Enable with tools.%s.completion.%s = true or a config table", entry.tool, entry.source))
+    else
+      local cfg = type(probe_cfg) == "table" and probe_cfg or {}
+      local completion = require(entry.module)
+      local resolved = completion.resolve_cmd({ cmd = cfg.cmd })
+      if resolved then
+        ok(string.format("%s: probe target found: %s", entry.tool, resolved[1]))
+      else
+        info(string.format('%s: probe target not found; no "/" completion until it resolves', entry.tool))
+      end
+    end
+  end
+
   -- Run integration-specific health checks
   local report = {
     start = start,
