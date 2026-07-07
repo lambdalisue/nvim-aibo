@@ -98,6 +98,40 @@ T["get_tool_config"] = function()
   eq(vim.tbl_count(unknown_config), 0)
 end
 
+-- Test the live-completion defaults and enable/disable behavior. Completion
+-- config lives under tools.<tool>.completion.<source> so it can vary per
+-- tool profile, not as a single global list.
+-- Reload aibo first so the default assertions do not depend on earlier tests
+-- (setup() is incremental and mutates the shared module config).
+T["completion config defaults and override"] = function()
+  package.loaded["aibo"] = nil
+  local aibo = require("aibo")
+
+  -- Default: all three are on (none has a static fallback to preserve).
+  aibo.setup()
+  eq(aibo.get_completion_config("claude", "claude"), true)
+  eq(aibo.get_completion_config("codex", "codex"), true)
+  eq(aibo.get_completion_config("gemini", "acp"), true)
+  eq(aibo.get_completion_config("claude", "unknown"), false)
+  eq(aibo.get_completion_config("unknown", "claude"), false)
+
+  -- Enabling with a config table takes effect (cmd/timeout default downstream)
+  aibo.setup({ tools = { claude = { completion = { claude = { timeout = 5000 } } } } })
+  local c2 = aibo.get_completion_config("claude", "claude")
+  eq(type(c2), "table")
+  eq(c2.timeout, 5000)
+
+  -- Explicit false disables again
+  aibo.setup({ tools = { claude = { completion = { claude = false } } } })
+  eq(aibo.get_completion_config("claude", "claude"), false)
+
+  -- A custom tool profile can opt into any completion source/module, not
+  -- just the one matching its own name (e.g. a custom "ollama" wrapper that
+  -- launches a claude-flavored model could set completion.claude = true).
+  aibo.setup({ tools = { ["ollama-claude"] = { completion = { claude = true } } } })
+  eq(aibo.get_completion_config("ollama-claude", "claude"), true)
+end
+
 -- Test send function
 T["send function"] = function()
   local aibo = require("aibo")
