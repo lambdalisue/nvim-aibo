@@ -29,7 +29,7 @@ jobs:
           args: false
 
       - name: Install Luacheck
-        run: luarocks install luacheck
+        run: sudo luarocks install luacheck
 
       - run: just lint
 
