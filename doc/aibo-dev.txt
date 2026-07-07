@@ -35,7 +35,10 @@ PLUGIN MAPPINGS				|aibo-dev-plug-mappings|
 INTRODUCTION					*aibo-dev-introduction*
 
 This document provides comprehensive developer documentation for |Aibo|.
-For user documentation, see |aibo.txt|.
+For user documentation, see |aibo.txt|. For the design behind live "/"
+completion (probing Claude/Codex/Gemini directly instead of a static list),
+see |aibo-live-completion.txt| (overview), |aibo-claude.txt|, |aibo-codex.txt|,
+and |aibo-acp.txt|.
 
 This guide covers:
 - Internal architecture and module organization

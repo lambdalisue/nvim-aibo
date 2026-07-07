@@ -1,0 +1,64 @@
+*aibo-claude.txt*	Claude live "/" completion probe for Aibo
+
+Author:  lambdalisue <lambdalisue@gmail.com>
+License: MIT license
+
+For the overall live "/" completion design (motivation, billing safety,
+configuration), see |aibo-live-completion.txt|.
+
+=============================================================================
+CLAUDE PROBE					*aibo-claude-probe*
+
+Direct probe, implemented in `completion/claude.lua`. Claude Code does not
+speak the Agent Client Protocol (ACP, see |aibo-acp.txt|) itself -- that
+needs a separate adapter (`claude-agent-acp`, wrapping the Claude Agent
+SDK). Since aibo already hard-depends on the `claude` binary (it drives the
+interactive session over a PTY), this module talks `claude`'s own internal
+stream-json control protocol directly instead, so live completion needs no
+adapter, no Node.js, and no npm.
+
+Protocol (reverse-engineered from `@anthropic-ai/claude-agent-sdk`'s
+`sdk.mjs`, which `claude-agent-acp` itself uses to drive `claude`):
+>
+	spawn `claude` (stdio child), cwd = the prompt buffer's directory
+	  --output-format stream-json --verbose --input-format stream-json
+	  --no-session-persistence
+	  -> write: {"request_id":"aibo-probe","type":"control_request",
+	            "request":{"subtype":"initialize"}}
+	  -> read one control_response with subtype "success"
+	  -> cache response.response.commands
+	  -> terminate
+<
+`commands` is exactly what the omnifunc needs: each entry has `name`,
+`description`, and an optional `argumentHint`/`aliases`.
+`--no-session-persistence` prevents this process from writing a
+session-history file. This is a control-plane request/response, not a
+prompt turn -- no `user` message is ever sent, so no inference runs and no
+tokens are consumed (see |aibo-live-completion-billing|).
+
+Verification (real machine, logged-in claude)~
+
+Verified directly against a real, logged-in `claude` (v2.1.202, Claude Max)
+using a hand-written stdio client (not the SDK):
+
+1. Round trip works and is fast. `initialize` -> `control_response` with
+   the full `commands` list arrived in ~1 second.
+2. `--no-session-persistence` has no observable side effect. Comparing
+   file counts under `~/.claude/projects` before/after a probe run with
+   this flag showed no new files.
+3. The payload includes real, personalized data -- not just the ~150
+   built-in commands, but the account's own custom commands/skills
+   (`~/.claude/commands`, `~/.claude/skills`, installed plugins).
+
+Caveat: not a versioned protocol~
+
+Unlike ACP, this `control_request`/`control_response` wire format is
+internal to the Claude Agent SDK -- it has no semver contract and can
+change on any `claude` release without notice. Every failure mode (timeout,
+parse error, early exit, unrecognized response shape) is treated as
+routine; there is no static fallback, so a broken probe means no "/"
+completion at all until it's fixed (or `tools.claude.completion.claude` is
+turned off; see |aibo-live-completion-config|).
+
+==============================================================================
+vim:tw=78:ts=8:ft=help:norl:

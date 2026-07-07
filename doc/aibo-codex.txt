@@ -1,0 +1,58 @@
+*aibo-codex.txt*	Codex live "/" completion probe for Aibo
+
+Author:  lambdalisue <lambdalisue@gmail.com>
+License: MIT license
+
+For the overall live "/" completion design (motivation, billing safety,
+configuration), see |aibo-live-completion.txt|.
+
+=============================================================================
+CODEX PROBE					*aibo-codex-probe*
+
+Direct probe, implemented in `completion/codex.lua`. Codex CLI does not
+speak the Agent Client Protocol (ACP, see |aibo-acp.txt|) itself -- that
+needs a separate adapter (`codex-acp`, wrapping the Codex runtime). Since
+aibo already hard-depends on the `codex` binary (it drives the interactive
+session over a PTY), this module talks `codex`'s own first-party
+`app-server` JSON-RPC protocol directly instead, so live completion needs
+no adapter, no Node.js, and no npm.
+
+Protocol: `codex app-server` is a subcommand already built into the `codex`
+binary itself -- no separate package needed. Crucially, its schema is
+self-documenting: running
+`codex app-server generate-json-schema --out <dir> --experimental` dumps
+the full JSON Schema for every method, including `skills/list` -- a
+meaningfully stronger foundation than Claude's case, which required
+reverse-engineering a minified JS bundle (see |aibo-claude.txt|).
+>
+	spawn `codex app-server` (stdio child), cwd = the prompt buffer's directory
+	  -> write: {"id":1,"method":"initialize","params":{"clientInfo":{...}}}
+	  -> read:  {"id":1,"result":{...}}
+	  -> write: {"id":2,"method":"skills/list","params":{}}
+	  -> read:  {"id":2,"result":{"data":[{"cwd":..,"skills":[...]}]}}
+	  -> terminate
+<
+`thread/start` (Codex's prompt-execution method) is never called, so no
+inference runs and no tokens are consumed (see |aibo-live-completion-billing|).
+
+Verification (real machine, logged-in codex)~
+
+Verified against a real, logged-in `codex` (v0.142.5): `initialize`
+answered in under a second; the follow-up `skills/list` returned real skill
+metadata (name, description, path, scope, enabled) for the machine's actual
+installed skills in ~1-2 seconds.
+
+There is no static builtin table for Codex, and no disk scan either --
+`skills/list` already returns the account's user/project/system skills.
+With the probe disabled or unavailable, no "/" completion is offered (see
+|aibo-live-completion-config|).
+
+Caveat: not a documented public API~
+
+Like Claude's probe, this is Codex's own internal control protocol, not a
+documented public API in the "stable CLI flags" sense -- every failure
+mode (timeout, parse error, exit, unrecognized response shape) is treated
+as routine and simply offers no commands.
+
+==============================================================================
+vim:tw=78:ts=8:ft=help:norl:
