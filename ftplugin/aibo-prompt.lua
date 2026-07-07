@@ -17,6 +17,8 @@ local cfg = aibo.get_buffer_config("prompt")
 if not (cfg and cfg.no_default_mappings) then
   local opts = { buffer = bufnr, nowait = true, silent = true }
   vim.keymap.set({ "n", "i" }, "<C-g><C-o>", "<Plug>(aibo-send)", { buffer = bufnr, nowait = true })
+  vim.keymap.set({ "n", "i" }, "<C-g>i", "<Plug>(aibo-direct)", { buffer = bufnr, nowait = true })
+  vim.keymap.set({ "n", "i" }, "<C-g><C-i>", "<Plug>(aibo-direct)", { buffer = bufnr, nowait = true })
   vim.keymap.set("n", "<CR>", "<Plug>(aibo-submit)", opts)
   vim.keymap.set("n", "<Esc>", "<Cmd>q<CR>", opts)
   vim.keymap.set("n", "<C-Enter>", "<Plug>(aibo-submit)<Cmd>q<CR>", opts)

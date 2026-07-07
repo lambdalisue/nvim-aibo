@@ -169,6 +169,21 @@ local function setup_mappings(bufnr)
       send(key)
     end
   end)
+  define("<Plug>(aibo-direct)", "Enter Direct mode: forward every key to the tool until <Esc>", function()
+    local winid = vim.api.nvim_get_current_win()
+    local info = M.get_info_by_winid(winid)
+    if not info then
+      return
+    end
+    -- Resolve the target bufnr up front rather than inside send_fn: Direct
+    -- mode may close other windows (e.g. hides a visible prompt) while
+    -- looping, so relying on "current window" per keystroke is unreliable.
+    local direct_mode = require("aibo.internal.direct_mode")
+    direct_mode.enter(winid, function(key)
+      local code = aibo.resolve(key) or key
+      M.send(info.bufnr, code)
+    end)
+  end)
   define("<Plug>(aibo-submit)", "Submit to the tool", function()
     submit("")
   end)
